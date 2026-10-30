@@ -75,7 +75,7 @@ func TestHistoryConsumerOutageLosesNothing(t *testing.T) {
 	ctx := context.Background()
 	pub := &bus.Publisher{URL: url, Name: "test-poll"}
 	defer pub.Close()
-	rel := &relay.Relay{Run: "test-run", Pub: pub}
+	rel := &relay.Relay{Run: relay.NewRun(time.Now()), Pub: pub}
 
 	// Positions published half an hour ago, ten seconds apart, three aircraft each: every minute is long over, so
 	// batches close as soon as the stream goes quiet.

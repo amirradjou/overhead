@@ -3,6 +3,7 @@
 package events
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/amirradjou/overhead/internal/feeds"
@@ -17,6 +18,13 @@ type Position struct {
 	Published time.Time `json:"published"`
 	feeds.Position
 }
+
+// runPattern is the form of a run id (relay.NewRun): start time and a random suffix. A run id ends up in file names,
+// so consumers check it before trusting a message.
+var runPattern = regexp.MustCompile(`^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}$`)
+
+// ValidRun reports whether run is a well-formed run id.
+func ValidRun(run string) bool { return runPattern.MatchString(run) }
 
 // EnrichJob asks for what is known about an aircraft, and about the flight it is flying under Callsign.
 type EnrichJob struct {

@@ -142,4 +142,7 @@ func TestNewRun(t *testing.T) {
 	if !regexp.MustCompile(`^20261029T220000Z-[0-9a-f]{6}$`).MatchString(a) || a == b {
 		t.Fatalf("runs %q %q", a, b)
 	}
+	if !events.ValidRun(a) || events.ValidRun("../../etc") || events.ValidRun("test-run") {
+		t.Fatal("ValidRun must accept NewRun's ids and nothing path-like")
+	}
 }

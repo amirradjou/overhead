@@ -60,7 +60,7 @@ func (w *Writer) Session(ctx context.Context, ch *amqp.Channel, deliveries <-cha
 				return errors.New("history: deliveries stopped")
 			}
 			var ev events.Position
-			if err := json.Unmarshal(d.Body, &ev); err != nil || ev.Run == "" || ev.Published.IsZero() {
+			if err := json.Unmarshal(d.Body, &ev); err != nil || !events.ValidRun(ev.Run) || ev.Published.IsZero() {
 				slog.Error("history: dropping a malformed message", "err", err, "body", string(d.Body[:min(len(d.Body), 120)]))
 				w.count(func(s *WriterStats) { s.Rejected++ })
 				_ = d.Reject(false)

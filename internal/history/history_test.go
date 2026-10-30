@@ -120,6 +120,15 @@ func TestEncodeAndDirStore(t *testing.T) {
 	}
 }
 
+func TestDirStoreStaysInsideItsRoot(t *testing.T) {
+	store := DirStore{Root: t.TempDir()}
+	for _, key := range []string{"../escape.jsonl.gz", "/etc/x.jsonl.gz", "positions/../../escape.jsonl.gz"} {
+		if err := store.Put(context.Background(), key, []byte("x")); err == nil {
+			t.Errorf("Put(%q) wrote outside the root", key)
+		}
+	}
+}
+
 func TestVerify(t *testing.T) {
 	root := t.TempDir()
 	store := DirStore{Root: root}

@@ -25,6 +25,9 @@ type DirStore struct{ Root string }
 
 // Put writes body to key, atomically: a reader sees the old file or the new one, never half of one.
 func (d DirStore) Put(_ context.Context, key string, body []byte) error {
+	if !filepath.IsLocal(filepath.FromSlash(key)) {
+		return fmt.Errorf("refusing key %q: not a path inside the store", key)
+	}
 	path := filepath.Join(d.Root, filepath.FromSlash(key))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
