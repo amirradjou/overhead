@@ -22,6 +22,7 @@ export default function Sky({ view, phase, featuredHex, next }: Props) {
   const w = view?.window;
   const visible = useMemo(() => view?.planes.filter((p) => p.in_view) ?? [], [view]);
   const trails = useTrails(visible, w);
+  const size = useScreenSize();
   const dark = phase === "night" || phase === "twilight";
 
   return (
@@ -36,19 +37,24 @@ export default function Sky({ view, phase, featuredHex, next }: Props) {
       )}
       {w && (
         <svg className="trails" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+          {/* Up to where the plane was at the last snapshot: it glides on from there, so the trail follows it. */}
           {[...trails].map(([hex, pts]) => (
             <polyline
               key={hex}
               className={hex === featuredHex ? "trail is-featured" : "trail"}
-              points={pts.map((p) => `${(p.x * 1000).toFixed(1)},${(p.y * 1000).toFixed(1)}`).join(" ")}
+              points={pts
+                .slice(0, -1)
+                .map((p) => `${(p.x * 1000).toFixed(1)},${(p.y * 1000).toFixed(1)}`)
+                .join(" ")}
               vectorEffect="non-scaling-stroke"
             />
           ))}
         </svg>
       )}
       {w &&
+        size &&
         visible.map((p) => (
-          <Craft key={p.hex} plane={p} w={w} dark={dark} featured={p.hex === featuredHex} />
+          <Craft key={p.hex} plane={p} w={w} size={size} dark={dark} featured={p.hex === featuredHex} />
         ))}
       {w && next?.coming && <Cue plane={next} w={w} />}
       <svg className="roofs" viewBox="0 0 1000 1000" preserveAspectRatio="none">
@@ -84,15 +90,38 @@ function useTrails(visible: Plane[], w: Window | undefined) {
   return trails;
 }
 
+// useScreenSize is the screen's size in pixels, for placing planes with transforms; null until the page runs.
+function useScreenSize(): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const measure = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  return size;
+}
+
+interface CraftProps {
+  plane: Plane;
+  w: Window;
+  size: { width: number; height: number };
+  dark: boolean;
+  featured: boolean;
+}
+
 // Craft is one plane in view: its navigation lights after dark, a silhouette by day, pointing the way it moves.
-function Craft({ plane, w, dark, featured }: { plane: Plane; w: Window; dark: boolean; featured: boolean }) {
+// It is placed with a transform and glides there by transition, which the compositor runs: no layout per frame.
+function Craft({ plane, w, size, dark, featured }: CraftProps) {
   const pos = toScreen(w, plane.offset_deg, plane.elevation_deg);
   const angle = useRef<number | null>(null);
   angle.current = nearestTurn(angle.current ?? 0, screenAngle(plane, w));
+  const x = (pos.x * size.width).toFixed(1);
+  const y = (pos.y * size.height).toFixed(1);
   return (
     <div
       className={`craft${featured ? " is-featured" : ""}`}
-      style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+      style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
     >
       <div className="craft-body" style={{ transform: `rotate(${angle.current}deg)` }}>
         {dark ? (

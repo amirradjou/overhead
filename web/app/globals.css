@@ -98,14 +98,19 @@ figure {
   stroke: rgb(255 255 255 / 0.32);
 }
 
-/* A plane in view. Positions arrive every 2 s; the transition glides it between them. */
+/* A plane in view. Positions arrive every 2 s; the transition glides it between them. Only transform and opacity
+   change, so the compositor moves it without a layout per frame. */
 .craft {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 0;
   height: 0;
+  will-change: transform;
   transition:
-    left 2.2s linear,
-    top 2.2s linear;
+    transform 2.2s linear,
+    opacity 1s;
+  animation: fade-in 0.9s ease-out;
 }
 .craft-body {
   position: absolute;
@@ -407,12 +412,15 @@ figure {
 .is-stale .caption,
 .is-stale .craft {
   opacity: 0.5;
+}
+.caption {
   transition: opacity 1s;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .strobe,
   .cue,
+  .craft,
   .caption-body,
   .fact {
     animation: none;

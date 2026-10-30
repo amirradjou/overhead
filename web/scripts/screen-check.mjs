@@ -443,7 +443,7 @@ async function check(chrome) {
       const wantCrafts = scene.traffic === "busy" ? 3 : 0;
       if (report.crafts !== wantCrafts)
         problems.push(`${report.crafts} planes on screen, want ${wantCrafts}`);
-      if (layouts > 30) problems.push(`${layouts} layouts in 6 s: something animates layout`);
+      if (layouts > 12) problems.push(`${layouts} layouts in 6 s: something animates layout`); // a few per snapshot
       console.log(
         `${problems.length ? "FAIL" : "ok  "} ${scene.name.padEnd(9)} ${file}  layouts/6s=${layouts} smallest text=${report.smallestText}px`,
       );
