@@ -145,6 +145,7 @@ func runLive(ctx context.Context, args []string) error {
 	}
 	addr := fs.String("addr", env("OVERHEAD_ADDR", ":8090"), "listen address (OVERHEAD_ADDR)")
 	web := fs.String("web", "", "serve the screen's static files from this directory (web/out)")
+	factsPath := fs.String("facts", dataPath("facts.json"), "facts for the screen, as overhead-stats writes them")
 	public := fs.Bool("public", false, "commercial flights only (the README privacy rule for the public demo)")
 	w := live.DefaultWindow
 	for _, f := range []struct {
@@ -194,6 +195,7 @@ func runLive(ctx context.Context, args []string) error {
 
 	var wg sync.WaitGroup
 	wg.Go(func() { srv.Run(ctx) })
+	wg.Go(func() { live.WatchFacts(ctx, *factsPath, state, 30*time.Second) })
 	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-live", bus.QueueLive, 500, consumer.Positions) })
 	wg.Go(func() {
 		_ = bus.Consume(ctx, amqpURL(), "overhead-live-aircraft", bus.QueueLiveAircraft, 100, consumer.Aircraft)

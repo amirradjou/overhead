@@ -44,6 +44,7 @@ type State struct {
 	received uint64
 	pruned   time.Time
 
+	facts                               []string
 	predicted                           map[string]prediction
 	predErrors                          []float64
 	predChecked, predWithin, predMissed int
@@ -194,6 +195,8 @@ type View struct {
 	Today int `json:"today"`
 	// Sources are the feeds the planes in view came from, to credit on screen.
 	Sources []string `json:"sources"`
+	// Facts are sentences about the history (overhead-stats) for the screen to show between planes.
+	Facts []string `json:"facts"`
 }
 
 // LatLon is a point in the JSON the screen reads.
@@ -218,7 +221,7 @@ func (s *State) View(now time.Time) View {
 	w := s.Window.normalised()
 	v := View{
 		At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Window: w,
-		Planes: []Plane{}, Sources: []string{},
+		Planes: []Plane{}, Sources: []string{}, Facts: append([]string{}, s.facts...),
 	}
 	sources := make(map[string]bool)
 	for hex, p := range s.pos {

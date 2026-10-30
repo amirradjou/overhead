@@ -121,6 +121,18 @@ export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a
 ./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
 ```
 
+Facts between planes (M4) come from the history, worked out by a small Python job with DuckDB; the live API rereads
+the file it writes:
+
+```sh
+(cd analysis && uv run overhead-stats facts --every 10)   # rewrites data/facts.json every 10 minutes
+(cd analysis && uv run overhead-stats passes > passes.csv) # one row per aircraft per pass, for a notebook
+```
+
+It uses the same OVERHEAD_LAT/LON and window settings, plus OVERHEAD_TZ (default America/Toronto) for days and
+hours. A fact appears only once the history can back it: "first time today" after two days of history, the
+month's rarest type and regulars after three.
+
 Without window settings the screen shows the whole sky round home, down to 5 degrees. `pnpm dev` in `web/` serves the
 screen with hot reload; add `?api=http://localhost:8090` to the address to point it at a running live API.
 
