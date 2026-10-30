@@ -564,6 +564,12 @@ a {
   animation: fade-in 1.2s ease-out both;
 }
 
+/* The scenery is drawn with filters (the forest, the ripples): its own layer, so planes and trails moving over it
+   never make it be drawn again. */
+.scenery {
+  will-change: transform;
+}
+
 /* The clouds drift with the wind, a little each way over a quarter of an hour: a transform, so the compositor moves
    the layer and nothing is laid out again. It bleeds past the sides, so the drift never shows an edge. */
 .clouds {
