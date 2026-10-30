@@ -61,7 +61,7 @@ func renderSummary(w io.Writer, s poller.Stats, end time.Time, maxGap time.Durat
 	for _, f := range s.Feeds {
 		line := fmt.Sprintf("  %-14s %d ok, %d errors, %d polls sat out", f.Name, f.OK, f.Errors, f.Waits)
 		if f.LastError != "" {
-			line += fmt.Sprintf("; last error at %s: %s", f.LastErrorAt.Local().Format(time.TimeOnly), f.LastError)
+			line += fmt.Sprintf("; last error at %s: %s", f.LastErrorAt.Local().Format(time.TimeOnly), feeds.Printable(f.LastError))
 		}
 		fmt.Fprintln(w, line)
 	}
@@ -105,7 +105,7 @@ func feedSummary(results []poller.FeedResult, limit int) string {
 		case r.Waiting:
 			parts[i] = r.Name + " backing off"
 		case r.Err != nil:
-			parts[i] = r.Name + " error: " + clip(reason(r), limit)
+			parts[i] = r.Name + " error: " + clip(feeds.Printable(reason(r)), limit)
 		default:
 			parts[i] = fmt.Sprintf("%s %d (%dms)", r.Name, r.Count, r.Took.Milliseconds())
 		}

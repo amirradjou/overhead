@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,6 +166,23 @@ func TestNowInSeconds(t *testing.T) {
 	got, err := b.positions("x", pearson, 30, fixtureNow)
 	if err != nil || len(got) != 1 || !got[0].At.Equal(time.UnixMilli(1793324881500)) {
 		t.Fatalf("got %+v, %v", got, err)
+	}
+}
+
+func TestFeedTextCannotDriveTheTerminal(t *testing.T) {
+	lat, lon := 43.6, -79.6
+	b := readsbResponse{Now: 1793324881501, AC: []readsbAircraft{{
+		Hex: "abc123", Flight: "ACA1\x1b[2J\x1b]0;pwned\x07  ", R: "C-\u009bGZQU", Lat: &lat, Lon: &lon,
+	}}}
+	got, err := b.positions("x", pearson, 30, fixtureNow)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	if got[0].Callsign != "ACA1[2J]0;pwned" || got[0].Registration != "C-GZQU" {
+		t.Fatalf("control characters kept: %q %q", got[0].Callsign, got[0].Registration)
+	}
+	if r := refusal([]byte("{\"error\":\"no\x1b[31m way\"}")); strings.ContainsRune(r, 0x1b) {
+		t.Fatalf("refusal kept an escape: %q", r)
 	}
 }
 

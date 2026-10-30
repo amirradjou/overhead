@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/amirradjou/overhead/internal/geo"
 )
@@ -133,17 +134,17 @@ func (b readsbResponse) positions(feed string, center geo.Point, radiusKm float6
 	}
 	out := make([]Position, 0, len(b.AC))
 	for _, a := range b.AC {
-		hex := strings.ToLower(strings.TrimSpace(a.Hex))
+		hex := strings.ToLower(Printable(a.Hex))
 		if hex == "" || a.Lat == nil || a.Lon == nil || surface(a.Category) {
 			continue
 		}
 		p := Position{
 			Hex:          hex,
-			Callsign:     strings.TrimSpace(a.Flight),
-			Registration: strings.TrimSpace(a.R),
-			TypeCode:     strings.TrimSpace(a.T),
-			Category:     a.Category,
-			Squawk:       a.Squawk,
+			Callsign:     Printable(a.Flight),
+			Registration: Printable(a.R),
+			TypeCode:     Printable(a.T),
+			Category:     Printable(a.Category),
+			Squawk:       Printable(a.Squawk),
 			Lat:          *a.Lat,
 			Lon:          *a.Lon,
 			SpeedKt:      a.GS,
@@ -151,13 +152,13 @@ func (b readsbResponse) positions(feed string, center geo.Point, radiusKm float6
 			Military:     a.DBFlags&flagMilitary != 0,
 			Private:      a.DBFlags&(flagPIA|flagLADD) != 0,
 			Source:       feed,
-			SourceType:   a.Type,
+			SourceType:   Printable(a.Type),
 		}
 		if !p.Point().Valid() || geo.DistanceKm(center, p.Point()) > radiusKm {
 			continue
 		}
 		if a.Emergency != "none" {
-			p.Emergency = a.Emergency
+			p.Emergency = Printable(a.Emergency)
 		}
 		p.AltFt, p.OnGround = altitude(a.AltBaro, a.AltGeom)
 		p.VertRateFpm = roundPtr(a.BaroRate)
@@ -223,7 +224,7 @@ func refusal(body []byte) string {
 		Error string `json:"error"`
 		Msg   string `json:"msg"`
 	}
-	text := strings.TrimSpace(string(body))
+	text := Printable(string(body))
 	if json.Unmarshal(body, &j) == nil {
 		text = strings.TrimSpace(j.Error + " " + j.Msg)
 	}
@@ -233,5 +234,16 @@ func refusal(body []byte) string {
 	if len(text) > 200 {
 		text = text[:200] + "…"
 	}
-	return text
+	return Printable(text)
+}
+
+// Printable drops control and other non-printing characters and trims spaces. Feed text ends up on a terminal, where
+// an escape sequence in a callsign or an error page could move the cursor, recolour or retitle the screen.
+func Printable(s string) string {
+	return strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, s))
 }
