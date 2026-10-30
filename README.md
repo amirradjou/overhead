@@ -4,8 +4,8 @@ The planes you can see from your window, live: a calm, screensaver-like view of 
 screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
 community flight-tracking feeds.
 
-> **Status: M0 (poller + terminal table) and M1 (event pipeline + enrichment) built.** This README is the spec. The milestones at the end track what is
-> built.
+> **Status: M0–M6 built (PRs #2–#9, 2026-10-30). M0 and M1 meet their "Done when"; M2–M7 do not yet, and the
+> milestone table says what each still needs.** This README is the spec.
 
 ## What it is
 
@@ -23,7 +23,8 @@ it, everything it saw is kept, so it can answer questions later, such as when an
 
 ## Data sources
 
-Personal, non-commercial use; every source is credited on screen. Terms and limits were checked on 2026-10-29: overhead
+Personal, non-commercial use; every source is credited on screen, and linked where a pointer exists (adsb.fi asks for
+a link to its home page). Terms and limits were checked on 2026-10-29: overhead
 asks adsb.fi every 5 s and adsb.lol every 15 s (one request every 5 s drew 429s within minutes), sends a User-Agent
 naming the project, backs off after errors and honours Retry-After.
 
@@ -32,9 +33,8 @@ naming the project, backs off after errors and honours Retry-After.
 | adsb.lol | live positions in a radius | free, no key, unfiltered; limits are "dynamic", and a key (for feeders) is planned |
 | adsb.fi | live positions in a radius | free for personal, non-commercial use; one request a second; credit with a link |
 | airplanes.live | live positions in a radius | free for non-commercial use, about one request a second; now answers 403 until the project is approved by email, so it is off by default |
-| OpenSky Network | live positions (fallback) and an aircraft database | free account, daily request credits |
 | adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data may not be copied into other databases, so routes stay in the day-long cache and never reach the history |
-| planespotters.net | a photo of that exact airframe | photographer credit and a link to the photo page on every photo |
+| planespotters.net | a photo of that exact airframe | photographer credit on every photo, linked to its photo page where a pointer exists; hotlinked, never proxied or stored; terms to read in a browser (the page refuses scripted fetches) |
 
 Coverage is what the volunteer receivers see — excellent around Toronto Pearson, thinner for very low flights.
 
@@ -49,23 +49,41 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
 3. **Live API** — consumes the live queue, keeps the current picture, works out where each plane appears from the
    window (its direction and its angle above the horizon) and which planes come into view next, by projecting each
    track a few minutes ahead, and serves it all over Server-Sent Events.
-4. **History** — consumes the history queue: one-minute batches of positions to S3 (gzipped JSONL), loaded into
-   Snowflake by Snowpipe;
-   positions are stitched into flights (one row per pass overhead) in the warehouse.
-5. **Stats** — facts for the screen to show between planes: the rarest types this month, firsts (an airframe or
-   airline never seen before), how often a route passes the window, busiest hours, the runway in use; explored in
-   Pandas notebooks first.
+4. **History** — consumes the history queue: one-minute batches of positions (gzipped JSONL) on local disk, stitched
+   into passes (one row per aircraft per pass) with DuckDB. That is what the facts and the heads-ups read, always on
+   and free. The same batches can go to S3 for Snowpipe to load into Snowflake, where the passes are rebuilt in SQL:
+   a test path, run on the Snowflake trial and taken down after (see Cost).
+5. **Facts** — short, true sentences. About the plane in view: its first pass here or how many this month, how far
+   it still has to go and the local time where it lands. Between planes: planes through the window today, the
+   busiest hour, this month's rarest type and regular, how often a flight number passes the window, and which way
+   Pearson is landing (so which side planes come from). Counted from the passes by flight number, never by route
+   (adsbdb's routes may not be stored). A fact appears only once the history backs it.
 6. **Screen (Next.js)** — the window view, made to be left on. The sky through your window, drawn to match what you
    see (the window's direction, width and lowest visible angle are settings); each plane where you would see it; the
    one in view named in large type (airline, from and to, aircraft, altitude, speed, a photo of that airframe); the
    next one coming, with a countdown and the side it will appear from; a small overview of everything around; a fact
    between planes. Calm by design: slow motion, dimmer at night, a slight drift over time so nothing burns into a TV,
-   and days of running without a reload in a TV browser.
+   and days of running without a reload in a TV browser. Readable from the sofa: no text under 23 px at 1080p, every
+   label at least 4.5:1 against the sky behind it, all text inside a 5% safe area. When nothing is coming, the sky is
+   the content: the sun, the moon and its phase, the bright stars and planets where they really are, and a fact; when
+   cloud hides the planes it says so; late at night with nothing flying it dims nearly to black. The small overview
+   is turned to the window (its direction at the top), not to north.
 7. **Heads-up** — consumes the alerts queue: an optional message on the phone (Telegram) when something worth
    getting up for is about to pass the window: a rare type, an unusually low pass, an emergency squawk
    (7500/7600/7700), a first-ever visitor. Each is sent once, with no duplicates.
-8. **Infra** — S3, IAM, the poller and RabbitMQ (one small Fargate task) on AWS, plus the Snowflake database, stage
-   and pipe, all as infrastructure as code in Terraform; one command up, one down.
+8. **Infra (tests only)** — S3, IAM, the poller and RabbitMQ (one small Fargate task) on AWS, plus the Snowflake
+   database, stage and pipe, all as infrastructure as code in Terraform; one command up, one down, with a budget
+   alert. It goes up to prove the cloud path and comes down after; the screen never depends on it.
+9. **Window setup** — the window is its direction (a phone compass set to true north, or the wall's bearing on a map;
+   magnetic north is about 10° off in Toronto), its left and right edges and its top as seen from where you sit, the
+   lowest angle visible over the roofs opposite (a phone level sighted along the roofline), and the home's height
+   above sea level (OVERHEAD_HOME_ELEV). A setup view draws every plane round home on a full-sky strip with the window
+   over it, so the numbers can be nudged until a plane you see enters where the screen says.
+10. **Where it runs** — at home, one always-on small machine runs the whole stack with one `docker compose up -d`
+    (RabbitMQ, poll, enrich, history, live, headsup and the facts job), restarting on boot. The TV shows it full
+    screen, best from a Raspberry Pi or HDMI stick in Chromium kiosk mode; the TV's own browser is best effort, and its
+    auto power-off timer must be off. The live API stays on the home network (it serves home's coordinates). The
+    public demo is the same stack in `-public` mode on the shared Hetzner box, centred on a public spot by the airport.
 
 ## Event flow (RabbitMQ)
 
@@ -86,8 +104,10 @@ container next to the poller; Amazon MQ would cost more than the rest of the pro
 Privacy rule for anything public: some private aircraft owners ask not to be identified, so the public demo shows
 commercial flights only and never registrations or owners of private aircraft.
 
-Cost: the Snowflake trial is time-limited — develop on DuckDB locally, move to Snowflake for M3, and keep the
-warehouse at X-Small with auto-suspend.
+Cost: nothing that runs all the time costs money beyond the home box and the shared Hetzner server. The Snowflake trial
+is time-limited and used once, for M3, M4 and M6, after a week of history exists locally; the warehouse is X-Small
+with a 60 s auto-suspend. AWS goes up for that check and down the same day: the Fargate task (0.5 vCPU, 1 GB, a public
+IPv4, ca-central-1) left running would cost roughly US$25 a month, so a US$5 budget alert comes first.
 
 ## Run it
 
@@ -184,11 +204,12 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 |---|---|---|
 | M0 ✅ | Poller + terminal table of planes within 30 km, two feeds merged | a one-hour run with no gap over 30 s and no duplicate aircraft — **720 polls, longest gap 5 s, no duplicates, see [M0 results](#m0-results)** |
 | M1 ✅ | Event pipeline (RabbitMQ) and enrichment with caching | at least 90% of commercial flights shown with type and route; under 5 API calls per new plane; stopping any consumer for 10 minutes loses no positions — **92% (24 of 26), 2.26 calls per new plane, 8,014 of 8,014 positions stored after a 10-minute outage, see [M1 results](#m1-results)** |
-| M2 | Window view v1: the sky through your window, the plane in view and the next one coming, over SSE | runs a full day in the TV browser without a reload; on one evening, 20 planes seen from the window appear on screen on the right side, and "coming next" is right to within a minute |
-| M3 | History: S3 → Snowpipe → Snowflake, flights stitched | a week of data; Snowflake row counts reconcile with the poller's own counts |
-| M4 | Stats + notebooks; a fact between planes on the screen | the facts shown match the notebook numbers |
-| M5 | Heads-up on the phone (Telegram) | replaying a stored day sends exactly the expected heads-ups, no duplicates |
-| M6 | Terraform for AWS + Snowflake; public demo | `make up` / `make down` from a clean account; demo follows the privacy rule |
+| M2 🔶 built | Window view v1: the sky through your window, the plane in view and the next one coming, over SSE | on the TV's own device (named in M2 results): 24 h without a reload, through one restart of `overhead live`, with the JS heap at 24 h under twice its 1 h size; screenshot tests at night, twilight, golden hour and day with no text under 23 px at 1080p; over one or two clear evenings, of 20 planes logged at the window at least 18 were on screen at that moment, each within 15° of where they were seen; and at least 80% of 1–5-minute "coming next" predictions over those evenings (at least 30, misses counted as wrong) came into view within a minute (`/api/predictions`) |
+| M3 🔶 built | History: S3 → Snowpipe → Snowflake, passes stitched | seven consecutive days of history (collected at home, or by Fargate) loaded through S3 and Snowpipe; for every run, Snowflake's distinct (run, seq) count equals `overhead verify`'s, and its passes per day equal DuckDB's `passes.sql`; at least one hour of it written to S3 by the Fargate task itself |
+| M4 🔶 built | Facts: about the plane in view and between planes | on three days of history, every figure a fact shows equals the same figure recomputed from Snowflake's passes (`02_passes.sql`), not from the same DuckDB query; while the feed is up, the caption is never empty between planes |
+| M5 🔶 built | Heads-up on the phone (Telegram) | replaying seven stored days sends exactly the heads-ups on a list made by hand from the passes (each emergency squawk, low pass over the window, rare or first-seen type), none twice; one live heads-up reaches the phone at least two minutes before its plane enters the window |
+| M6 🔶 built | Terraform for AWS + Snowflake | from a clean account, `make up` brings everything up and the Fargate task's batches reach Snowflake; `make down` leaves nothing (`terraform state list` empty, bucket gone); the test costs under US$5 |
+| M7 | Public demo | seven days on the shared Hetzner box without a restart: centred on a public spot by the airport, `-public` on, every plane shown has an airline callsign, home's coordinates appear in no response, the credits link to each source and each photo to its planespotters page, and the feeds see the same request rate with 1 viewer or 50 |
 
 ## M0 results
 
