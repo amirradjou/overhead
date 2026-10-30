@@ -159,6 +159,10 @@ func runLive(ctx context.Context, args []string) error {
 	if err := c.check("live"); err != nil {
 		return err
 	}
+	// Everything below stops with ctx; a listener that fails cancels it, so the command exits with its error rather
+	// than draining the queues with no one to serve.
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
 	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public}
 	srv := &live.Server{State: state}
 	if *web != "" {
@@ -194,6 +198,7 @@ func runLive(ctx context.Context, args []string) error {
 	slog.Info("serving", "addr", *addr, "public", *public, "web", *web)
 	select {
 	case err = <-errc:
+		stop()
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

@@ -71,6 +71,13 @@ func (c *Consumer) ask(ctx context.Context, ev events.Position) {
 		return
 	}
 	c.asked[ev.Hex] = time.Now()
+	if len(c.asked) > 1000 { // forget asks old enough to be asked again
+		for hex, at := range c.asked {
+			if time.Since(at) >= askAgain {
+				delete(c.asked, hex)
+			}
+		}
+	}
 	c.mu.Unlock()
 	body, _ := json.Marshal(events.EnrichJob{Hex: ev.Hex, Callsign: ev.Callsign})
 	if err := c.Pub.Publish(ctx, bus.Message{Exchange: bus.ExchangeEnrich, Key: bus.KeyJob, Body: body}); err != nil {

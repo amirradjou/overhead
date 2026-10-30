@@ -40,6 +40,7 @@ type State struct {
 	today    map[string]struct{}
 	flights  map[string]*flight
 	received uint64
+	pruned   time.Time
 }
 
 // flight is one commercial flight's pass through the circle, for the coverage tally.
@@ -155,6 +156,7 @@ func (s *State) View(now time.Time) View {
 	if maxAge <= 0 {
 		maxAge = DefaultMaxAge
 	}
+	s.prune(now)
 	v := View{At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Planes: []Plane{}, Sources: []string{}}
 	sources := make(map[string]bool)
 	for hex, p := range s.pos {
@@ -197,6 +199,34 @@ func (s *State) View(now time.Time) View {
 		v.Today = len(s.today)
 	}
 	return v
+}
+
+// How long the state remembers an aircraft's enrichment after it leaves, and a flight for the coverage tally.
+const (
+	keepInfo    = 6 * time.Hour
+	keepFlights = 7 * 24 * time.Hour
+	pruneEvery  = time.Minute
+)
+
+// prune forgets enrichment for aircraft long gone and flights older than the coverage window, at most once a
+// minute, so a process left running for months holds what it needs, not everything it ever saw. Caller holds s.mu.
+func (s *State) prune(now time.Time) {
+	if now.Sub(s.pruned) < pruneEvery {
+		return
+	}
+	s.pruned = now
+	for hex, a := range s.info {
+		p, here := s.pos[hex]
+		gone := !here || now.Sub(p.At) > keepInfo // a position this old is about to be dropped anyway
+		if gone && now.Sub(a.Looked) > keepInfo {
+			delete(s.info, hex)
+		}
+	}
+	for key, f := range s.flights {
+		if now.Sub(f.last) > keepFlights {
+			delete(s.flights, key)
+		}
+	}
 }
 
 func eta(p feeds.Position, r *events.Route) (*float64, *float64) {

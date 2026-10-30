@@ -177,6 +177,23 @@ func TestServerNowAndStream(t *testing.T) {
 	}
 }
 
+func TestPruneForgetsWhatIsLongGone(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 30}
+	s.Update(pos("aaaaaa", "ACA1", 43.70, t0))
+	s.SetAircraft(events.Aircraft{Hex: "aaaaaa", TypeCode: "A320", Looked: t0})
+	s.SetAircraft(events.Aircraft{Hex: "gone00", TypeCode: "B38M", Looked: t0})
+	s.View(t0.Add(7 * time.Hour)) // aaaaaa's position is stale by now too
+	if s.HasInfo("gone00") || s.HasInfo("aaaaaa") {
+		t.Fatal("enrichment for aircraft gone six hours was kept")
+	}
+	s.Update(pos("bbbbbb", "ACA2", 43.70, t0.Add(7*time.Hour)))
+	s.SetAircraft(events.Aircraft{Hex: "bbbbbb", Looked: t0})
+	s.View(t0.Add(7*time.Hour + 2*time.Minute))
+	if !s.HasInfo("bbbbbb") {
+		t.Fatal("enrichment for an aircraft still in the picture was dropped")
+	}
+}
+
 func TestCommercial(t *testing.T) {
 	for cs, want := range map[string]bool{"ACA101": true, "POE672": true, "WJA9": true, "JZA8Q": true, "N123AB": false, "CGXYZ": false, "": false} {
 		if got := Commercial(feeds.Position{Callsign: cs}); got != want {
