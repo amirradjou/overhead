@@ -11,8 +11,10 @@ import {
   landing,
   operator,
   photoCredit,
+  sourceHomes,
   speed,
   trend,
+  webLink,
   whereFromHome,
 } from "./format";
 import { comingNext, inView } from "./pick";
@@ -50,6 +52,23 @@ const porter = plane({
     },
     photo: { thumbnail: "t.jpg", link: "l", photographer: "Frederick Tremblay" },
   },
+});
+
+describe("credits", () => {
+  it("links every source to its home page", () => {
+    expect(sourceHomes["adsb.fi"]).toBe("https://adsb.fi");
+    expect(sourceHomes["adsb.lol"]).toBe("https://adsb.lol");
+    expect(sourceHomes["adsbdb"]).toBe("https://www.adsbdb.com");
+  });
+
+  it("follows only web links from the feeds", () => {
+    expect(webLink("https://www.planespotters.net/photo/123")).toBe(
+      "https://www.planespotters.net/photo/123",
+    );
+    expect(webLink("javascript:alert(1)")).toBeUndefined();
+    expect(webLink("data:text/html,hi")).toBeUndefined();
+    expect(webLink(undefined)).toBeUndefined();
+  });
 });
 
 describe("format", () => {

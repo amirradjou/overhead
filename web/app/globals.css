@@ -318,6 +318,7 @@ a {
   right: var(--safe-x);
   width: 6.5rem;
   height: 6.5rem;
+  overflow: visible; /* the N may sit just outside the disc */
 }
 .overview-edge {
   fill: rgb(0 0 0 / 0.18);
@@ -373,9 +374,11 @@ a {
 }
 .photo {
   flex: none;
-  position: relative;
   margin-right: 1rem;
   text-shadow: none;
+}
+.photo figure {
+  position: relative;
 }
 .photo img {
   display: block;
@@ -443,12 +446,15 @@ a {
   position: absolute;
   right: var(--safe-x);
   bottom: var(--safe-y);
-  width: 15rem;
   text-align: right;
   font-size: 0.82rem;
   line-height: 1.3;
   color: var(--text-faint);
   text-shadow: 0 0 0.6rem var(--roof);
+}
+.credits span {
+  display: block;
+  white-space: nowrap;
 }
 
 .is-stale .caption,

@@ -37,6 +37,20 @@ export function compassTicks(w: Window): { label: string; x: number }[] {
   return ticks;
 }
 
+/**
+ * How far to turn the overview disc so the window's direction is at the top: the window's azimuth, or none for a
+ * window that sees all round (north up, as a map would be).
+ */
+export function overviewTurn(w: Window): number {
+  return w.fov_deg >= 360 ? 0 : w.azimuth_deg;
+}
+
+/** A point at a compass angle (clockwise from the top) and a distance from the centre, in SVG's y-down space. */
+export function polar(deg: number, d: number): { x: number; y: number } {
+  const a = (deg * Math.PI) / 180;
+  return { x: d * Math.sin(a), y: -d * Math.cos(a) };
+}
+
 /** A small seeded random generator (mulberry32), so stars and rooftops come out the same on every load. */
 export function seeded(seed: number): () => number {
   let a = seed >>> 0;

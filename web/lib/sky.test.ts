@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { compassTicks, nearestTurn, roofline, rooftops, seeded, stars, toScreen, topDeg } from "./sky";
+import {
+  compassTicks,
+  nearestTurn,
+  overviewTurn,
+  polar,
+  roofline,
+  rooftops,
+  seeded,
+  stars,
+  toScreen,
+  topDeg,
+} from "./sky";
 import { skyPhase, sunElevation } from "./sun";
 import type { Window } from "./types";
 
@@ -25,6 +36,21 @@ describe("the window on screen", () => {
     expect(round).toHaveLength(8);
     expect(round.find((t) => t.label === "N")?.x).toBe(0.5);
     expect(round.find((t) => t.label === "S")?.x).toBe(1);
+  });
+
+  it("turns the overview so the window faces up, north wherever it falls", () => {
+    expect(overviewTurn(south)).toBe(180);
+    expect(overviewTurn(allRound)).toBe(0);
+    // Facing south, a plane due south of home is straight up the disc and north is at the bottom.
+    const up = polar(180 - overviewTurn(south), 10);
+    expect(up.x).toBeCloseTo(0);
+    expect(up.y).toBeCloseTo(-10);
+    const north = polar(0 - overviewTurn(south), 10);
+    expect(north.y).toBeCloseTo(10);
+    // Facing south-south-west (200°), a plane due west (270°) is 70° right of the top.
+    const west = polar(270 - 200, 10);
+    expect(west.x).toBeGreaterThan(0);
+    expect(west.y).toBeLessThan(0);
   });
 
   it("turns a plane the short way round", () => {

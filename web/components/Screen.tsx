@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Caption from "./Caption";
 import Overview from "./Overview";
 import Sky from "./Sky";
+import { sourceHomes } from "@/lib/format";
 import { comingNext, inView } from "@/lib/pick";
 import { skyPhase, sunElevation } from "@/lib/sun";
 import { useLiveView } from "@/lib/useLiveView";
@@ -24,7 +25,7 @@ export default function Screen() {
   const planes = view?.planes ?? [];
   const visible = inView(planes);
   const next = comingNext(planes)[0];
-  const sources = view?.sources.length ? view.sources.join(" and ") : "community ADS-B feeds";
+  const sources = view?.sources ?? [];
 
   return (
     <main className={`screen sky-${phase}${status === "live" ? "" : " is-stale"}`}>
@@ -41,17 +42,44 @@ export default function Screen() {
             plane={visible[0]}
             alsoInView={visible.length - 1}
             next={next}
-            today={view?.today}
             facts={view?.facts ?? []}
             now={now}
             status={status}
           />
           <p className="credits">
-            Positions from {sources}; aircraft and routes from adsbdb; photos from planespotters.net.
+            <span>
+              Positions from{" "}
+              {sources.length
+                ? sources.map((name, i) => (
+                    <Fragment key={name}>
+                      {i > 0 && (i === sources.length - 1 ? " and " : ", ")}
+                      <Site name={name} />
+                    </Fragment>
+                  ))
+                : "community ADS-B feeds"}
+            </span>
+            <span>
+              Aircraft and routes from <Site name="adsbdb" label="adsbdb.com" />
+            </span>
+            <span>
+              Photos from <Site name="planespotters.net" />
+            </span>
           </p>
         </div>
       </div>
     </main>
+  );
+}
+
+// Site names a source by its address, linked to its home page, as the sources' terms ask.
+function Site({ name, label }: { name: string; label?: string }) {
+  const home = sourceHomes[name];
+  return home ? (
+    <a href={home} rel="noopener">
+      {label ?? name}
+    </a>
+  ) : (
+    <>{label ?? name}</>
   );
 }
 

@@ -1,4 +1,13 @@
-import { arrival, flightFacts, flightName, fromTo, landing, operator, photoCredit } from "@/lib/format";
+import {
+  arrival,
+  flightFacts,
+  flightName,
+  fromTo,
+  landing,
+  operator,
+  photoCredit,
+  webLink,
+} from "@/lib/format";
 import type { Status } from "@/lib/useLiveView";
 import type { Plane } from "@/lib/types";
 
@@ -6,7 +15,6 @@ interface Props {
   plane?: Plane;
   alsoInView: number;
   next?: Plane;
-  today?: number;
   facts: string[];
   now: Date | null;
   status: Status;
@@ -16,7 +24,7 @@ interface Props {
 const factEvery = 20_000;
 
 // The words over the rooftops: the plane in view, or what comes next; between planes, a fact about the history.
-export default function Caption({ plane, alsoInView, next, today, facts, now, status }: Props) {
+export default function Caption({ plane, alsoInView, next, facts, now, status }: Props) {
   const fact = facts.length && now ? facts[Math.floor(now.getTime() / factEvery) % facts.length] : undefined;
   return (
     <section className="caption" aria-live="polite">
@@ -34,13 +42,13 @@ export default function Caption({ plane, alsoInView, next, today, facts, now, st
               </span>
             )}
           </>
-        ) : fact ? (
-          <span key={fact} className="fact">
-            {fact}
-          </span>
         ) : (
-          today !== undefined &&
-          today > 0 && <span>{today === 1 ? "One aircraft" : `${today} aircraft`} passed by today.</span>
+          // The server's facts include the day's count of planes across the window: the one "today" number shown.
+          fact && (
+            <span key={fact} className="fact">
+              {fact}
+            </span>
+          )
         )}
       </p>
     </section>
@@ -54,10 +62,13 @@ function InView({ plane }: { plane: Plane }) {
   return (
     <div className="in-view">
       {photo && (
-        <figure className="photo">
-          <img src={photo.large || photo.thumbnail} alt="" />
-          <figcaption>{photoCredit(plane)}</figcaption>
-        </figure>
+        // Linked to the photo's page on planespotters.net, as their terms ask.
+        <a className="photo" href={webLink(photo.link)} rel="noopener">
+          <figure>
+            <img src={photo.large || photo.thumbnail} alt="" />
+            <figcaption>{photoCredit(plane)}</figcaption>
+          </figure>
+        </a>
       )}
       <div>
         {plane.notable && <p className="notable">{plane.notable}</p>}

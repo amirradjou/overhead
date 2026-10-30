@@ -101,6 +101,20 @@ export function label(p: Plane): string {
   return p.callsign || p.registration || p.info?.registration || p.hex.toUpperCase();
 }
 
+/** The home pages of the sources the screen credits, which their terms ask to be named and linked. */
+export const sourceHomes: Record<string, string> = {
+  "adsb.fi": "https://adsb.fi",
+  "adsb.lol": "https://adsb.lol",
+  "airplanes.live": "https://airplanes.live",
+  adsbdb: "https://www.adsbdb.com",
+  "planespotters.net": "https://www.planespotters.net",
+};
+
+/** A link from the feeds, if it is a web address: anything else (javascript:, data:) is dropped, not followed. */
+export function webLink(url: string | undefined): string | undefined {
+  return url && /^https?:\/\//i.test(url) ? url : undefined;
+}
+
 /** "Photo by Frederick Tremblay, planespotters.net": the credit planespotters' terms ask for. */
 export function photoCredit(p: Plane): string {
   const ph = p.info?.photo;
