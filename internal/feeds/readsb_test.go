@@ -178,7 +178,8 @@ func TestFeedTextCannotDriveTheTerminal(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got %+v, %v", got, err)
 	}
-	if got[0].Callsign != "ACA1[2J]0;pwned" || got[0].Registration != "C-GZQU" {
+	// The callsign fails ADS-B's alphabet outright; the registration keeps its printable part.
+	if got[0].Callsign != "" || got[0].Registration != "C-GZQU" {
 		t.Fatalf("control characters kept: %q %q", got[0].Callsign, got[0].Registration)
 	}
 	if r := refusal([]byte("{\"error\":\"no\x1b[31m way\"}")); strings.ContainsRune(r, 0x1b) {
