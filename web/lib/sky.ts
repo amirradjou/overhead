@@ -2,8 +2,14 @@
 // the horizon, from the lowest angle visible over the rooftops to the top of the screen.
 import type { Window } from "./types";
 
-/** The highest angle drawn; anything above it sits at the top edge, as it would at the top of a window frame. */
+/** The highest angle drawn for a window without a top edge; anything above it sits at the top of the screen. */
 export const topDeg = 70;
+
+/** The angle at the top of the screen: the window's top edge, or topDeg when it has none (or a higher one). */
+export function screenTop(w: Window): number {
+  const edge = w.max_elevation_deg;
+  return edge !== undefined && edge > w.min_elevation_deg && edge < topDeg ? edge : topDeg;
+}
 
 /** Where the rooftops end and the sky begins, as a fraction of the screen's height from the top. */
 export const roofline = 0.72;
@@ -11,7 +17,7 @@ export const roofline = 0.72;
 /** Screen position, each 0 to 1, of something seen offsetDeg right of the window's centre and elevationDeg up. */
 export function toScreen(w: Window, offsetDeg: number, elevationDeg: number): { x: number; y: number } {
   const x = 0.5 + offsetDeg / w.fov_deg;
-  const up = (elevationDeg - w.min_elevation_deg) / (topDeg - w.min_elevation_deg);
+  const up = (elevationDeg - w.min_elevation_deg) / (screenTop(w) - w.min_elevation_deg);
   const y = roofline * (1 - Math.min(1, Math.max(0, up)));
   return { x: Math.min(1, Math.max(0, x)), y };
 }
@@ -33,7 +39,9 @@ export function offsetFrom(w: Window, azDeg: number): number {
  * the top edge and between the sides. */
 export function inFrame(w: Window, offsetDeg: number, elevationDeg: number): boolean {
   return (
-    Math.abs(offsetDeg) <= w.fov_deg / 2 && elevationDeg >= w.min_elevation_deg && elevationDeg <= topDeg
+    Math.abs(offsetDeg) <= w.fov_deg / 2 &&
+    elevationDeg >= w.min_elevation_deg &&
+    elevationDeg <= screenTop(w)
   );
 }
 

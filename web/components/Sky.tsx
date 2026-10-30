@@ -10,7 +10,7 @@ import {
   roofline,
   rooftops,
   toScreen,
-  topDeg,
+  screenTop,
 } from "@/lib/sky";
 import { sunGlow } from "@/lib/skyColour";
 import { magnitudeLimit, starColour, starsAbove } from "@/lib/stars";
@@ -255,7 +255,7 @@ function Cue({ plane, w }: { plane: Plane; w: Window }) {
 function screenAngle(p: Plane, w: Window): number {
   if (!p.motion) return 0;
   const dx = p.motion.offset_deg / w.fov_deg; // screen widths
-  const dy = ((-p.motion.elevation_deg / (topDeg - w.min_elevation_deg)) * roofline * 9) / 16; // in widths, 16:9
+  const dy = ((-p.motion.elevation_deg / (screenTop(w) - w.min_elevation_deg)) * roofline * 9) / 16; // in widths, 16:9
   return (Math.atan2(dy, dx) * 180) / Math.PI;
 }
 

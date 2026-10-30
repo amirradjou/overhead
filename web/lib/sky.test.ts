@@ -10,6 +10,7 @@ import {
   rooftops,
   seeded,
   toScreen,
+  screenTop,
   topDeg,
 } from "./sky";
 import { skyPhase, sunElevation } from "./sun";
@@ -100,5 +101,27 @@ describe("the sun over Toronto", () => {
     expect(skyPhase(-3)).toBe("twilight");
     expect(skyPhase(4)).toBe("golden");
     expect(skyPhase(30)).toBe("day");
+  });
+});
+
+describe("a window with a top edge", () => {
+  const framed: Window = {
+    azimuth_deg: 180,
+    fov_deg: 90,
+    min_elevation_deg: 5,
+    max_elevation_deg: 40,
+    home_elevation_m: 0,
+  };
+  it("puts the top edge at the top of the screen, and nothing above it in the frame", () => {
+    expect(screenTop(framed)).toBe(40);
+    expect(toScreen(framed, 0, 40).y).toBe(0);
+    expect(toScreen(framed, 0, 22.5).y).toBeCloseTo(roofline / 2);
+    expect(inFrame(framed, 0, 41)).toBe(false);
+    expect(inFrame(framed, 0, 39)).toBe(true);
+  });
+  it("falls back to the usual top without an edge, or with none worth drawing", () => {
+    expect(screenTop({ ...framed, max_elevation_deg: 90 })).toBe(topDeg);
+    expect(screenTop({ ...framed, max_elevation_deg: undefined })).toBe(topDeg);
+    expect(screenTop({ ...framed, max_elevation_deg: 3 })).toBe(topDeg);
   });
 });
