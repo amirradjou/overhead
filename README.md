@@ -124,6 +124,16 @@ export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a
 Without window settings the screen shows the whole sky round home, down to 5 degrees. `pnpm dev` in `web/` serves the
 screen with hot reload; add `?api=http://localhost:8090` to the address to point it at a running live API.
 
+History to S3 and Snowflake (M3): the writer puts the same batches in a bucket, and Snowpipe loads them.
+
+```sh
+./bin/overhead history -s3 s3://<bucket>/history       # AWS_REGION and credentials as usual
+# then, in Snowflake, snowflake/01_load.sql (stage, table, pipe), 02_passes.sql, and 03_reconcile.sql to check counts
+docker compose --profile s3 up -d s3                     # a local S3 (rclone) to try it without AWS:
+OVERHEAD_S3_ENDPOINT=http://localhost:9010 AWS_ACCESS_KEY_ID=overhead AWS_SECRET_ACCESS_KEY=overhead-s3-local \
+  AWS_REGION=us-east-1 ./bin/overhead history -s3 s3://overhead/history
+```
+
 Every position event carries the poller's run id and a sequence number, so `verify` can prove nothing was lost or
 stored twice. The history writer acknowledges a batch only after writing it, and a batch's file name comes from its
 first sequence number, so a redelivered batch overwrites its own file. Changing a queue's arguments in

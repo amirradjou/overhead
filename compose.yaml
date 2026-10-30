@@ -22,5 +22,21 @@ services:
       retries: 6
     restart: unless-stopped
 
+  # An S3-compatible server for the history writer's S3 store, only with `--profile s3`: rclone serves a directory
+  # over the S3 API. Buckets are its top-level directories; overhead and overhead-test exist from the start.
+  s3:
+    profiles: ["s3"]
+    image: rclone/rclone:1.69
+    entrypoint: ["sh", "-c"]
+    command:
+      - mkdir -p /data/overhead /data/overhead-test &&
+        exec rclone serve s3 /data --addr :9000 --auth-key overhead,overhead-s3-local
+    ports:
+      - "127.0.0.1:9010:9000"
+    volumes:
+      - s3:/data
+    mem_limit: 256m
+
 volumes:
   rabbitmq:
+  s3:
