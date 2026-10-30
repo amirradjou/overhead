@@ -14,6 +14,7 @@ import (
 	"github.com/amirradjou/overhead/internal/buildinfo"
 	"github.com/amirradjou/overhead/internal/feeds"
 	"github.com/amirradjou/overhead/internal/geo"
+	"github.com/amirradjou/overhead/internal/live"
 	"github.com/amirradjou/overhead/internal/poller"
 )
 
@@ -145,6 +146,35 @@ func envFloat(name string, fallback float64) (float64, error) {
 		return 0, fmt.Errorf("%s=%q is not a number", name, s)
 	}
 	return f, nil
+}
+
+// addWindowFlags registers the window's settings (README: Screen), each with its environment variable.
+func addWindowFlags(fs *flag.FlagSet) (*live.Window, error) {
+	w := live.DefaultWindow
+	for _, f := range []struct {
+		dst       *float64
+		flag, env string
+		usage     string
+	}{
+		{&w.AzimuthDeg, "window-az", "OVERHEAD_WINDOW_AZ", "the direction the window faces, degrees from north (180: south)"},
+		{&w.FOVDeg, "window-fov", "OVERHEAD_WINDOW_FOV", "how wide a slice of sky the window shows, in degrees (360: all round)"},
+		{&w.MinElevationDeg, "window-min-el", "OVERHEAD_WINDOW_MIN_EL", "the lowest angle above the horizon visible over what stands opposite"},
+		{&w.HomeElevationM, "home-elev", "OVERHEAD_HOME_ELEV", "the window's height above sea level, in metres"},
+	} {
+		v, err := envFloat(f.env, *f.dst)
+		if err != nil {
+			return nil, usageError{err.Error()}
+		}
+		fs.Float64Var(f.dst, f.flag, v, f.usage+" ("+f.env+")")
+	}
+	return &w, nil
+}
+
+func checkWindow(cmd string, w live.Window) error {
+	if w.FOVDeg <= 0 || w.FOVDeg > 360 || w.MinElevationDeg < -5 || w.MinElevationDeg >= 90 {
+		return usageError{"overhead " + cmd + ": -window-fov must be 1 to 360 and -window-min-el below 90"}
+	}
+	return nil
 }
 
 func envCenter() (geo.Point, error) {

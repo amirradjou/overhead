@@ -2,6 +2,7 @@ package history
 
 import (
 	"bufio"
+	"cmp"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/amirradjou/overhead/internal/events"
 )
 
 // RunReport is what the stored history holds of one poller run.
@@ -102,4 +106,52 @@ func readBatch(path string, add func(run string, seq uint64)) error {
 		return fmt.Errorf("%s: %w", path, err)
 	}
 	return nil
+}
+
+// Read returns the stored events published in [from, to), in publish order (then sequence order), each once.
+func Read(root string, from, to time.Time) ([]events.Position, error) {
+	var out []events.Position
+	seen := make(map[string]bool)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".jsonl.gz") {
+			return err
+		}
+		return eachEvent(path, func(ev events.Position) {
+			key := fmt.Sprintf("%s/%d", ev.Run, ev.Seq)
+			if seen[key] || ev.Published.Before(from) || !ev.Published.Before(to) {
+				return
+			}
+			seen[key] = true
+			out = append(out, ev)
+		})
+	})
+	slices.SortFunc(out, func(a, b events.Position) int {
+		if c := a.Published.Compare(b.Published); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Seq, b.Seq)
+	})
+	return out, err
+}
+
+func eachEvent(path string, add func(events.Position)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	sc := bufio.NewScanner(zr)
+	sc.Buffer(make([]byte, 64<<10), 1<<20)
+	for sc.Scan() {
+		var ev events.Position
+		if err := json.Unmarshal(sc.Bytes(), &ev); err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		add(ev)
+	}
+	return sc.Err()
 }

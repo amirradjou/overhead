@@ -146,9 +146,9 @@ type Plane struct {
 	Motion       *Motion `json:"motion,omitempty"`
 }
 
-// specialTypes are airframes rare almost anywhere, by ICAO type designator. Rarity at home (what is unusual over this
+// SpecialTypes are airframes rare almost anywhere, by ICAO type designator. Rarity at home (what is unusual over this
 // street) comes from the history in M4; this list covers the obvious cases until then.
-var specialTypes = map[string]string{
+var SpecialTypes = map[string]string{
 	"A124": "Antonov An-124 Ruslan",
 	"A225": "Antonov An-225 Mriya",
 	"AN22": "Antonov An-22",
@@ -175,7 +175,7 @@ func notable(p feeds.Position) string {
 	if p.Emergency != "" {
 		return "Declared emergency: " + p.Emergency
 	}
-	if name, ok := specialTypes[p.TypeCode]; ok {
+	if name, ok := SpecialTypes[p.TypeCode]; ok {
 		return "Rare visitor: " + name
 	}
 	if p.Military {
