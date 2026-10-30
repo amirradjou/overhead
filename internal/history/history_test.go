@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -180,5 +181,34 @@ func TestVerify(t *testing.T) {
 	}
 	if s := (Range{7, 8}).String(); s != "7-8" {
 		t.Errorf("Range.String = %q", s)
+	}
+}
+
+func TestEachStreamsARangeInOrder(t *testing.T) {
+	root := t.TempDir()
+	store := DirStore{Root: root}
+	write := func(minute time.Time, seqs ...uint64) {
+		bt := &Batch{Minute: minute, Run: "r1", FirstSeq: seqs[0]}
+		for _, s := range seqs {
+			_, line := ev("r1", s, minute)
+			bt.Lines = append(bt.Lines, line)
+		}
+		body, _ := bt.Encode()
+		if err := store.Put(context.Background(), bt.Key(), body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	yesterday := t0.Add(-24 * time.Hour)
+	write(yesterday, 1, 2)        // a day before the range: its directory is skipped
+	write(t0, 3, 4)               // in range
+	write(t0.Add(time.Hour), 5)   // in range
+	write(t0.Add(3*time.Hour), 6) // after it
+	var seqs []uint64
+	err := Each(root, t0, t0.Add(2*time.Hour), func(e events.Position) { seqs = append(seqs, e.Seq) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(seqs, []uint64{3, 4, 5}) {
+		t.Fatalf("seqs = %v", seqs)
 	}
 }

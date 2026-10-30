@@ -150,6 +150,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 		looked := out.Looked
 		out = ac
 		out.Hex, out.Looked = job.Hex, looked
+		out.Registration = registration(out.Registration) // here, so airframes cached before the fix are fixed too
 	}
 	if routeFound {
 		route = corrected(route) // here rather than at lookup, so routes cached before a fix are corrected too

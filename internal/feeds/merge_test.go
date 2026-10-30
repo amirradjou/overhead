@@ -69,3 +69,31 @@ func TestMergeEmpty(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestMergeKeepsTheTypeTheCategoryAllows(t *testing.T) {
+	t0 := time.Date(2026, 10, 30, 20, 0, 0, 0, time.UTC)
+	// As c012ed on 2026-10-30: an A220 in one feed's database, an AS350 helicopter in the other's.
+	got := Merge(
+		[]Position{{Hex: "c012ed", TypeCode: "BCS3", Category: "A3", At: t0}},
+		[]Position{{Hex: "c012ed", TypeCode: "AS50", Category: "A3", At: t0.Add(time.Second)}},
+	)
+	if got[0].TypeCode != "BCS3" {
+		t.Fatalf("type = %s, want BCS3", got[0].TypeCode)
+	}
+	// A real helicopter keeps its helicopter type.
+	got = Merge(
+		[]Position{{Hex: "c0aaaa", TypeCode: "BCS3", Category: "A7", At: t0}},
+		[]Position{{Hex: "c0aaaa", TypeCode: "AS50", Category: "A7", At: t0.Add(time.Second)}},
+	)
+	if got[0].TypeCode != "AS50" {
+		t.Fatalf("type = %s, want AS50", got[0].TypeCode)
+	}
+	// Without a category nothing can be judged: the fresher report wins, as before.
+	got = Merge(
+		[]Position{{Hex: "c0bbbb", TypeCode: "B736", At: t0}},
+		[]Position{{Hex: "c0bbbb", TypeCode: "B38M", At: t0.Add(time.Second)}},
+	)
+	if got[0].TypeCode != "B38M" {
+		t.Fatalf("type = %s, want B38M", got[0].TypeCode)
+	}
+}

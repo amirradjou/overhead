@@ -134,6 +134,34 @@ func Read(root string, from, to time.Time) ([]events.Position, error) {
 	return out, err
 }
 
+// Each calls fn with every stored event published in [from, to), file by file in time order. Unlike Read it holds
+// nothing, so a whole day can be replayed in a small container; whole days outside the range are skipped unread.
+// A batch stored twice is seen twice.
+func Each(root string, from, to time.Time, fn func(events.Position)) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if day, ok := strings.CutPrefix(d.Name(), "dt="); ok {
+				t, perr := time.Parse(time.DateOnly, day) // the batches' UTC day
+				if perr == nil && (!t.Add(24*time.Hour).After(from) || !t.Before(to)) {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".jsonl.gz") {
+			return nil
+		}
+		return eachEvent(path, func(ev events.Position) {
+			if !ev.Published.Before(from) && ev.Published.Before(to) {
+				fn(ev)
+			}
+		})
+	})
+}
+
 func eachEvent(path string, add func(events.Position)) error {
 	f, err := os.Open(path)
 	if err != nil {

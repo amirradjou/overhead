@@ -1,6 +1,7 @@
 package feeds
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -33,7 +34,22 @@ func Merge(reports ...[]Position) []Position {
 	return out
 }
 
+// helicopter matches ICAO designators of helicopters: a type that cannot be right for an aircraft whose emitter
+// category is not A7 (rotorcraft).
+var helicopter = regexp.MustCompile(`^(R22|R44|R66|B06|B407|B412|B429|B505|EC\d\d|AS\d\d|A1[0-6]9|AW\d+|S76|H60|BK17|MD[56]\d\d?)$`)
+
 func fillIdentity(p, from Position) Position {
+	// Two feeds' aircraft databases can disagree on the type (c012ed: an A220 in one, an AS350 helicopter in the
+	// other); keep the one the emitter category allows, so the type does not flip from one report to the next.
+	cat := p.Category
+	if cat == "" {
+		cat = from.Category
+	}
+	rotor := cat == "A7"
+	if cat != "" && p.TypeCode != "" && from.TypeCode != "" && p.TypeCode != from.TypeCode &&
+		helicopter.MatchString(p.TypeCode) != rotor && helicopter.MatchString(from.TypeCode) == rotor {
+		p.TypeCode = from.TypeCode
+	}
 	if p.Callsign == "" {
 		p.Callsign = from.Callsign
 	}

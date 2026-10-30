@@ -87,32 +87,67 @@ func TestViewJoinsEnrichmentAndETA(t *testing.T) {
 }
 
 func TestViewDropsImpossibleRoutes(t *testing.T) {
-	// Over Lake Ontario, as on 2026-10-30.
-	lake := geo.Point{Lat: 43.45, Lon: -79.30}
 	airport := func(lat, lon float64) events.Airport { return events.Airport{Lat: lat, Lon: lon} }
 	bos, lga, ewr, mco := airport(42.3643, -71.0052), airport(40.7769, -73.874), airport(40.6925, -74.1687), airport(28.4294, -81.309)
 	ytz, lhr, yyz := airport(43.6275, -79.3962), airport(51.47, -0.4543), airport(43.6772, -79.6306)
-	jfk, hnd := airport(40.6398, -73.7789), airport(35.5523, 139.78)
+	jfk, hnd, ams, sfo := airport(40.6398, -73.7789), airport(35.5523, 139.78), airport(52.3086, 4.7639), airport(37.619, -122.375)
+	dfw, dca, yqy, yqb := airport(32.8968, -97.038), airport(38.8521, -77.0377), airport(46.1614, -60.0478), airport(46.7911, -71.3933)
+	cun, yow := airport(21.0365, -86.8771), airport(45.3225, -75.6692)
+	// Over Lake Ontario, and round Pearson, as on 2026-10-30.
+	lake := geo.Point{Lat: 43.45, Lon: -79.30}
+	nearYYZ := geo.Point{Lat: 43.62, Lon: -79.50} // 12 km south-east of Pearson
 	for _, c := range []struct {
 		name     string
+		at       geo.Point
+		alt, fpm int
+		ground   bool
 		from, to events.Airport
 		keep     bool
 	}{
-		{"UAL397 Newark to Orlando", ewr, mco, false},
-		{"RPA5603 Boston to LaGuardia", bos, lga, false},
-		{"PTR2943 Boston to Billy Bishop", bos, ytz, true},
-		{"ACA855 Heathrow to Pearson", lhr, yyz, true},
-		{"JAL5 JFK to Haneda, over Canada", jfk, hnd, true},
-		{"no origin: nothing to check", events.Airport{}, mco, true},
+		{"UAL397 Newark to Orlando, over the lake", lake, 35000, 0, false, ewr, mco, false},
+		{"RPA5603 Boston to LaGuardia, over the lake", lake, 33000, 0, false, bos, lga, false},
+		{"PTR2943 Boston to Billy Bishop, coming down", lake, 3000, -700, false, bos, ytz, true},
+		{"ACA855 Heathrow to Pearson, coming down", lake, 5000, -900, false, lhr, yyz, true},
+		{"JAL5 JFK to Haneda, cruising over Canada", lake, 37000, 0, false, jfk, hnd, true},
+		{"a Pearson departure climbing out", nearYYZ, 6000, 2000, false, yyz, lhr, true},
+		{"no origin: nothing to check", lake, 3000, 0, false, events.Airport{}, mco, true},
+		// The six the independent check found wrong.
+		{"KLM147 'Pearson to Amsterdam' landing at Pearson", nearYYZ, 3000, -800, false, yyz, ams, false},
+		{"UAL1172 'Boston to San Francisco' landing at Pearson", nearYYZ, 3700, -600, false, bos, sfo, false},
+		{"AAL1876 'Dallas to Washington' on the ground at Pearson", geo.Point{Lat: 43.68, Lon: -79.62}, 0, 0, true, dfw, dca, false},
+		{"JZA482 'Pearson to Sydney NS' cruising over Pearson", nearYYZ, 35000, 0, false, yyz, yqy, false},
+		{"ROU1798 'Quebec to Cancun' climbing out of Toronto", nearYYZ, 7875, 1500, false, yqb, cun, false},
+		{"POE505 'Ottawa to Orlando' parked at Pearson", geo.Point{Lat: 43.685, Lon: -79.625}, 0, 0, true, yow, mco, false},
 	} {
 		s := &State{Center: pearson, RadiusKm: 60}
-		p := pos("aaaaaa", "XXX1", lake.Lat, t0)
-		p.Lon = lake.Lon
+		p := pos("aaaaaa", "XXX1", c.at.Lat, t0)
+		p.Lon, p.OnGround = c.at.Lon, c.ground
+		alt, fpm := c.alt, c.fpm
+		if c.ground {
+			p.AltFt = nil
+		} else {
+			p.AltFt, p.VertRateFpm = &alt, &fpm
+		}
 		s.Update(p)
 		s.SetAircraft(events.Aircraft{Hex: "aaaaaa", Route: &events.Route{Callsign: "XXX1", Origin: c.from, Destination: c.to}})
 		if got := s.View(t0).Planes[0].Info.Route != nil; got != c.keep {
 			t.Errorf("%s: route shown = %v, want %v", c.name, got, c.keep)
 		}
+	}
+}
+
+func TestETAOnlyWhileHeadingIn(t *testing.T) {
+	yyz := events.Airport{Lat: 43.6772, Lon: -79.6306}
+	r := &events.Route{Callsign: "WJA712", Destination: yyz}
+	p := pos("aaaaaa", "WJA712", 43.80, t0).Position // 13.7 km north of Pearson
+	south, east := 190.0, 90.0
+	p.TrackDeg = &south
+	if _, m := eta(p, r); m == nil {
+		t.Fatal("heading for Pearson: no time to landing")
+	}
+	p.TrackDeg = &east // on a downwind leg, vectored round
+	if km, m := eta(p, r); m != nil || km == nil {
+		t.Fatalf("on a downwind leg: time %v, distance %v", m, km)
 	}
 }
 

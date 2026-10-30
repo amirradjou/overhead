@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -212,8 +213,21 @@ func (r *adsbdbRoute) toRoute() *events.Route {
 // airlineFixes corrects adsbdb's airline for callsign prefixes it has wrong. It gives PTR to the Nova Scotia
 // Department of Lands and Forests, but PTR is Porter's Dash 8 fleet, in and out of Billy Bishop all day: 37 flights
 // on 2026-10-30, every one a DH8D (Porter's jets fly as POE, which adsbdb has right).
+//
+// ROU is Air Canada Rouge (adsbdb has a Chilean operator), and Jazz flies as Air Canada Express (adsbdb still has
+// the old "Air Canada Jazz"); both found by checking overhead's screen against independent sources on 2026-10-30.
 var airlineFixes = map[string]struct{ name, iata string }{
 	"PTR": {"Porter Airlines", "PD"},
+	"ROU": {"Air Canada Rouge", "RV"},
+	"JZA": {"Air Canada Express", "QK"},
+}
+
+// canadian matches the "CA-GFJD" form adsbdb gives some Canadian registrations; the register's own is "C-GFJD".
+var canadian = regexp.MustCompile(`^CA-([A-Z]{4})$`)
+
+// registration returns reg as it is painted on the aircraft.
+func registration(reg string) string {
+	return canadian.ReplaceAllString(reg, "C-$1")
 }
 
 // corrected returns r with a known-wrong airline replaced, and its flight number given the airline's IATA code when

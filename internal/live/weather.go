@@ -21,7 +21,7 @@ type Weather struct {
 	// Code is the WMO weather code: 0 clear, 1–3 partly cloudy to overcast, 45/48 fog, 51–67 drizzle and rain,
 	// 71–77 snow, 80–82 showers, 85/86 snow showers, 95–99 thunderstorms.
 	Code int `json:"code"`
-	// Cloud cover in percent: all of it, and low (up to about 2 km), mid and high.
+	// Cloud cover in percent: all of it, and low (up to about 2–3 km), mid and high.
 	CloudCover  int     `json:"cloud_cover"`
 	CloudLow    int     `json:"cloud_low"`
 	CloudMid    int     `json:"cloud_mid"`
@@ -31,6 +31,10 @@ type Weather struct {
 	// WindFromDeg is where the wind blows from, degrees clockwise from north.
 	WindFromDeg float64 `json:"wind_from_deg"`
 	GustKmh     float64 `json:"gust_kmh"`
+	// PressureHPa is the sea-level pressure, which corrects the planes' pressure altitudes.
+	PressureHPa float64 `json:"pressure_hpa,omitempty"`
+	// Station is the airport whose weather report gave the sky, wind and pressure, when one did.
+	Station string `json:"station,omitempty"`
 }
 
 // weatherStale is how old a reading may be and still be shown: past it, the screen draws no clouds rather than old
@@ -50,7 +54,7 @@ func (c *WeatherClient) Now(ctx context.Context, p geo.Point) (Weather, error) {
 		"latitude":  {fmt.Sprintf("%.3f", p.Lat)},
 		"longitude": {fmt.Sprintf("%.3f", p.Lon)},
 		"current": {"temperature_2m,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high," +
-			"visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m"},
+			"visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl"},
 		"wind_speed_unit": {"kmh"},
 		"timezone":        {"UTC"},
 	}
@@ -81,6 +85,7 @@ func (c *WeatherClient) Now(ctx context.Context, p geo.Point) (Weather, error) {
 			Wind       float64 `json:"wind_speed_10m"`
 			WindFrom   float64 `json:"wind_direction_10m"`
 			Gust       float64 `json:"wind_gusts_10m"`
+			Pressure   float64 `json:"pressure_msl"`
 		} `json:"current"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&ans); err != nil {
@@ -94,6 +99,7 @@ func (c *WeatherClient) Now(ctx context.Context, p geo.Point) (Weather, error) {
 	return Weather{
 		At: at, TempC: cur.Temp, Code: cur.Code, CloudCover: cur.Cloud, CloudLow: cur.Low, CloudMid: cur.Mid,
 		CloudHigh: cur.High, VisibilityM: cur.Visibility, WindKmh: cur.Wind, WindFromDeg: cur.WindFrom, GustKmh: cur.Gust,
+		PressureHPa: cur.Pressure,
 	}, nil
 }
 
