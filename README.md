@@ -1,7 +1,8 @@
 # overhead
 
-The planes above home, live — on the TV across the room, with the history of everything that flew over and an alert
-when something rare does. No radio hardware: it reads free community flight-tracking feeds.
+The planes you can see from your window, live: a calm, screensaver-like view of the sky outside, on the TV or a spare
+screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
+community flight-tracking feeds.
 
 > **Status: M0 (poller + terminal table) built.** This README is the spec. The milestones at the end track what is
 > built.
@@ -10,9 +11,15 @@ when something rare does. No radio hardware: it reads free community flight-trac
 
 Every airliner broadcasts its position, altitude and identity (ADS-B). Thousands of hobbyists receive those
 broadcasts and share them through community networks that publish the merged live picture. overhead asks those
-networks "what is within 30 km of home?" every few seconds, works out what each plane is and where it is going, shows
-it on a screen designed to be read from the sofa, and keeps everything it saw so it can answer questions later:
-what was the rarest aircraft this month, what is the busiest hour over the street, when did an A380 last come by.
+networks what is flying around home every few seconds and turns the answer into the view through your window. It
+knows which way the window faces, how wide it is and how far down you can see over the buildings opposite, so it
+draws each plane where you would see it, in the same direction and at the same height above the horizon, and names
+it: the airline, where it is flying from and to, the aircraft, how high and how fast. Between planes it says which
+one is coming next, from which side and in about how long, and offers a fact worth knowing: the rarest visitor this
+month, the first time an airframe has passed, the busiest hour over the street.
+
+It is meant to be left on, like a screensaver: slow, quiet, dim at night and safe for a TV that is on all day. Behind
+it, everything it saw is kept, so it can answer questions later, such as when an A380 last came by.
 
 ## Data sources
 
@@ -33,21 +40,30 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
 
 ## What it needs to do
 
-1. **Poller (Go)** — query two feeds for a radius around home every ~5 s, merge by ICAO address (freshest report
+1. **Poller (Go)** — query two feeds for a 60 km circle round home every ~5 s (wide enough to see a plane coming a
+   few minutes before it reaches the window), merge by ICAO address (freshest report
    wins), normalise into one position event, and publish it to RabbitMQ (see Event flow).
 2. **Enrichment** — type, registration, operator, route and photo per aircraft, as jobs on a work queue; results are
    cached (routes for a day, airframes for a month) so the free APIs see a handful of calls per new plane, not one per
    poll.
-3. **Live API** — consumes the live queue, keeps the current picture, and serves it over Server-Sent Events.
+3. **Live API** — consumes the live queue, keeps the current picture, works out where each plane appears from the
+   window (its direction and its angle above the horizon) and which planes come into view next, by projecting each
+   track a few minutes ahead, and serves it all over Server-Sent Events.
 4. **History** — consumes the history queue: one-minute batches of positions to S3 (gzipped JSONL), loaded into
    Snowflake by Snowpipe;
    positions are stitched into flights (one row per pass overhead) in the warehouse.
-5. **Stats** — rarest types this month, firsts, busiest hours, runway-in-use guesses, an approach-path heatmap;
-   explored in Pandas notebooks first, then served as screen panels.
-6. **Screen (Next.js)** — a 10-foot UX: big type, dark theme, live map, a "closest plane right now" card (photo,
-   airline, route, altitude, minutes to landing), today's count and a rare-visitor banner. Must work in a TV browser.
-7. **Alerts** — consume the alerts queue: rules for rare types, military traffic, emergency squawks (7500/7600/7700) and first-ever sightings,
-   sent to Telegram with no duplicates.
+5. **Stats** — facts for the screen to show between planes: the rarest types this month, firsts (an airframe or
+   airline never seen before), how often a route passes the window, busiest hours, the runway in use; explored in
+   Pandas notebooks first.
+6. **Screen (Next.js)** — the window view, made to be left on. The sky through your window, drawn to match what you
+   see (the window's direction, width and lowest visible angle are settings); each plane where you would see it; the
+   one in view named in large type (airline, from and to, aircraft, altitude, speed, a photo of that airframe); the
+   next one coming, with a countdown and the side it will appear from; a small overview of everything around; a fact
+   between planes. Calm by design: slow motion, dimmer at night, a slight drift over time so nothing burns into a TV,
+   and days of running without a reload in a TV browser.
+7. **Heads-up** — consumes the alerts queue: an optional message on the phone (Telegram) when something worth
+   getting up for is about to pass the window: a rare type, an unusually low pass, an emergency squawk
+   (7500/7600/7700), a first-ever visitor. Each is sent once, with no duplicates.
 8. **Infra** — S3, IAM, the poller and RabbitMQ (one small Fargate task) on AWS, plus the Snowflake database, stage
    and pipe, all as infrastructure as code in Terraform; one command up, one down.
 
@@ -107,10 +123,10 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 |---|---|---|
 | M0 ✅ | Poller + terminal table of planes within 30 km, two feeds merged | a one-hour run with no gap over 30 s and no duplicate aircraft — **720 polls, longest gap 5 s, no duplicates, see [M0 results](#m0-results)** |
 | M1 | Event pipeline (RabbitMQ) and enrichment with caching | at least 90% of commercial flights shown with type and route; under 5 API calls per new plane; stopping any consumer for 10 minutes loses no positions |
-| M2 | Screen v1: live map + closest-plane card over SSE | runs a full day in the TV browser without a reload |
+| M2 | Window view v1: the sky through your window, the plane in view and the next one coming, over SSE | runs a full day in the TV browser without a reload; on one evening, 20 planes seen from the window appear on screen on the right side, and "coming next" is right to within a minute |
 | M3 | History: S3 → Snowpipe → Snowflake, flights stitched | a week of data; Snowflake row counts reconcile with the poller's own counts |
-| M4 | Stats + notebooks, "today / this month" panels on the screen | rarest-type and busiest-hour panels match the notebook numbers |
-| M5 | Alerts to Telegram | replaying a stored day fires exactly the expected alerts, no duplicates |
+| M4 | Stats + notebooks; a fact between planes on the screen | the facts shown match the notebook numbers |
+| M5 | Heads-up on the phone (Telegram) | replaying a stored day sends exactly the expected heads-ups, no duplicates |
 | M6 | Terraform for AWS + Snowflake; public demo | `make up` / `make down` from a clean account; demo follows the privacy rule |
 
 ## M0 results
