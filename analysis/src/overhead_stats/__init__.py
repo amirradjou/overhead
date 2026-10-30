@@ -45,6 +45,10 @@ def connect(history: Path, home_lat: float, home_lon: float) -> duckdb.DuckDBPyC
     Each event appears once even if a batch was written twice: rows are unique by run and sequence number.
     """
     con = duckdb.connect()
+    # A small job on a small box: DuckDB's defaults (a thread per core, each with its own read buffers) ran out of
+    # memory in a 384 MB container on a few hours of history.
+    con.execute("SET threads = 2")
+    con.execute("SET preserve_insertion_order = false")
     con.execute("SET TimeZone = 'UTC'")
     con.execute("SET VARIABLE home_lat = ?", [home_lat])
     con.execute("SET VARIABLE home_lon = ?", [home_lon])
