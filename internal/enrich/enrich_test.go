@@ -230,6 +230,25 @@ func TestWorkerUnknownAirframeStillGetsItsRoute(t *testing.T) {
 	}
 }
 
+func TestWorkerCachedUnknownsStayUnknown(t *testing.T) {
+	w, apis, _ := newWorker(t)
+	ctx := context.Background()
+	// An airframe adsbdb doesn't know, a callsign without a route, no photo: asked twice, the second from the cache.
+	job := events.EnrichJob{Hex: "aaaaaa", Callsign: "ZZZ999"}
+	for i := range 2 {
+		got, err := w.Enrich(ctx, job)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.TypeCode != "" || got.Route != nil || got.Photo != nil {
+			t.Fatalf("ask %d: unknowns came back as empty values: %+v route=%+v photo=%+v", i+1, got, got.Route, got.Photo)
+		}
+	}
+	if apis.calls["aircraft"] != 1 || apis.calls["route"] != 1 || apis.calls["photo"] != 1 {
+		t.Fatalf("calls = %v: the second ask should be answered from the cache", apis.calls)
+	}
+}
+
 func TestWorkerPartialResultOnPhotoFailure(t *testing.T) {
 	w, apis, _ := newWorker(t)
 	ctx := context.Background()

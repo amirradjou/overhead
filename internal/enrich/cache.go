@@ -80,8 +80,9 @@ func (c *Cache) get(bucket []byte, key string, dst any) (hit, found bool, err er
 	return true, e.Found, nil
 }
 
-// put stores v under key for ttl; a nil v records that the API didn't know key.
-func (c *Cache) put(bucket []byte, key string, v any, ttl time.Duration) error {
+// put stores *v under key for ttl; a nil v records that the API didn't know key. It is generic, not a method on
+// `any`, because a nil *Photo in an `any` is not nil: "unknown" would be stored as found and empty.
+func put[T any](c *Cache, bucket []byte, key string, v *T, ttl time.Duration) error {
 	e := entry{Found: v != nil, Expires: c.now().Add(ttl)}
 	if v != nil {
 		data, err := json.Marshal(v)

@@ -93,7 +93,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 			if acFound {
 				ac = *a
 			}
-			if err := w.Cache.put(bucketAircraft, job.Hex, a, ttl(acFound, airframeTTL, airframeMissTTL)); err != nil {
+			if err := put(w.Cache, bucketAircraft, job.Hex, a, ttl(acFound, airframeTTL, airframeMissTTL)); err != nil {
 				return out, err
 			}
 			if settled {
@@ -101,7 +101,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 				if routeFound {
 					route = *r
 				}
-				if err := w.Cache.put(bucketRoute, job.Callsign, r, routeTTL); err != nil {
+				if err := put(w.Cache, bucketRoute, job.Callsign, r, routeTTL); err != nil {
 					return out, err
 				}
 			}
@@ -117,7 +117,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 			if routeFound {
 				route = *r
 			}
-			if err := w.Cache.put(bucketRoute, job.Callsign, r, routeTTL); err != nil {
+			if err := put(w.Cache, bucketRoute, job.Callsign, r, routeTTL); err != nil {
 				return out, err
 			}
 		}
@@ -140,7 +140,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 			if photoFound {
 				photo = *p
 			}
-			if err := w.Cache.put(bucketPhoto, job.Hex, p, ttl(photoFound, photoTTL, photoMissTTL)); err != nil {
+			if err := put(w.Cache, bucketPhoto, job.Hex, p, ttl(photoFound, photoTTL, photoMissTTL)); err != nil {
 				return out, err
 			}
 		}
