@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Clouds from "./Clouds";
 import Scenery from "./Scenery";
 import { shown } from "@/lib/airport";
+import { attitude, draw, lookFor, sunVector } from "@/lib/aircraft3d";
 import { label } from "@/lib/format";
 import {
   compassTicks,
@@ -59,6 +60,11 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
   const weather = view?.weather;
   const visible = useMemo(() => shown(view).filter((p) => p.in_view), [view]);
   const trails = useTrails(visible, w);
+  const turns = useTurnRates(visible);
+  const sunVec = useMemo(
+    () => sunVector(sun ? { alt: Math.round(sun.alt), az: Math.round(sun.az / 5) * 5 } : null),
+    [sun && Math.round(sun.alt), sun && Math.round(sun.az / 5)],
+  );
   const size = useScreenSize();
   const dark = phase === "night" || phase === "twilight";
 
@@ -171,7 +177,16 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
       {w &&
         size &&
         visible.map((p) => (
-          <Craft key={p.hex} plane={p} w={w} size={size} dark={dark} featured={p.hex === featuredHex} />
+          <Craft
+            key={p.hex}
+            plane={p}
+            w={w}
+            size={size}
+            dark={dark}
+            featured={p.hex === featuredHex}
+            sun={sunVec}
+            turn={turns.get(p.hex) ?? 0}
+          />
         ))}
       {w && next?.coming && <Cue plane={next} w={w} />}
       {!scenery && (
@@ -257,36 +272,112 @@ interface CraftProps {
   size: { width: number; height: number };
   dark: boolean;
   featured: boolean;
+  /** The sun's direction, east-north-up, or null at night. */
+  sun: [number, number, number] | null;
+  /** How fast its track is turning, degrees a second: for its bank. */
+  turn: number;
 }
 
 // Craft is one plane in view: its navigation lights after dark, a silhouette by day, pointing the way it moves.
 // It is placed with a transform and glides there by transition, which the compositor runs: no layout per frame.
-function Craft({ plane, w, size, dark, featured }: CraftProps) {
+function Craft({ plane, w, size, dark, featured, sun, turn }: CraftProps) {
   const pos = toScreen(w, plane.offset_deg, plane.elevation_deg);
-  const angle = useRef<number | null>(null);
-  angle.current = nearestTurn(angle.current ?? 0, screenAngle(plane, w));
+  const look = useMemo(
+    () => lookFor(plane),
+    // Its kind and colours change only with its type or operator.
+    [plane.type_code, plane.info?.type_code, plane.category, plane.callsign, plane.info?.route?.airline_icao],
+  );
+  // Its true size from the window, made larger so it reads from the sofa: far off a small model, close in more of
+  // the sky, as close planes are.
+  const scale = size.height / 1080;
+  const slantM = (plane.distance_km * 1000) / Math.max(0.25, Math.cos((plane.elevation_deg * Math.PI) / 180));
+  const trueDeg = ((look.lengthM / Math.max(200, slantM)) * 180) / Math.PI;
+  const lengthPx =
+    Math.min(260, Math.max(featured ? 100 : 64, trueDeg * (size.width / w.fov_deg) * 3)) * scale;
+  const att = attitude(plane, turn);
+  // Drawn again only when the view of it changes enough to see.
+  const key = [
+    Math.round(att.headingDeg / 2),
+    Math.round(att.pitchDeg),
+    Math.round(att.rollDeg / 3),
+    Math.round(plane.bearing_deg),
+    Math.round(plane.elevation_deg),
+    Math.round(lengthPx / 3),
+    dark,
+    sun?.map((v) => v.toFixed(1)).join(),
+  ].join("|");
+  const drawn = useMemo(
+    () =>
+      draw(
+        look,
+        att,
+        { bearingDeg: plane.bearing_deg, elevationDeg: plane.elevation_deg },
+        sun,
+        lengthPx,
+        dark,
+      ),
+    [look, key],
+  );
+  const box = Math.ceil(lengthPx * 1.7);
   const x = (pos.x * size.width).toFixed(1);
   const y = (pos.y * size.height).toFixed(1);
+  const at = ([lx, ly]: [number, number]) => ({ transform: `translate(${lx}px, ${ly}px)` });
+  // Landing lights burn below 10,000 ft and on the runway; they glare when the nose points at the window.
+  const lit = (plane.alt_ft ?? 99999) < 10000 || (plane.on_ground && (plane.speed_kt ?? 0) > 30);
+  const glare = lit ? drawn.glare * (dark ? 1 : 0.55) : 0;
+  const labelLeft = pos.x > 0.8;
+  const labelAt = Math.round(lengthPx * 0.42 + 10 * scale);
   return (
     <div
-      className={`craft${featured ? " is-featured" : ""}${pos.x > 0.8 ? " label-left" : ""}`}
+      className={`craft${featured ? " is-featured" : ""}${labelLeft ? " label-left" : ""}`}
       style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
     >
-      <div className="craft-body" style={{ transform: `rotate(${angle.current}deg)` }}>
-        {dark ? (
-          <>
-            {/* Seen from below, the left (red) wing of a plane flying right is the one farther away: higher up. */}
-            <i className="light port" />
-            <i className="light starboard" />
-            <i className="light strobe" style={{ animationDelay: `${strobeDelay(plane.hex)}s` }} />
-          </>
-        ) : (
-          <svg className="silhouette" viewBox="0 0 24 24">
-            <path d="M22.5 12c0 .7-.6 1.1-1.4 1.1h-6l-4.8 8.4H8.2l2.6-8.4H5.4l-2 2.6H1.5L2.5 12l-1-3.7h1.9l2 2.6h5.4L8.2 2.5h2.1l4.8 8.4h6c.8 0 1.4.4 1.4 1.1z" />
-          </svg>
-        )}
-      </div>
-      <span className="craft-label">{label(plane)}</span>
+      <svg
+        className="model"
+        width={box}
+        height={box}
+        viewBox={`${-box / 2} ${-box / 2} ${box} ${box}`}
+        style={{ left: -box / 2, top: -box / 2 }}
+      >
+        {drawn.faces.map((f, i) => (
+          <polygon key={i} points={f.points} fill={f.fill} opacity={f.opacity} />
+        ))}
+      </svg>
+      {dark && (
+        <>
+          <i className="light port" style={at(drawn.lights.port)} />
+          <i className="light starboard" style={at(drawn.lights.starboard)} />
+          <i className="light tail" style={at(drawn.lights.tail)} />
+          <i
+            className="light beacon"
+            style={{ ...at(drawn.lights.beacon), animationDelay: `${strobeDelay(plane.hex)}s` }}
+          />
+          <i
+            className="light strobe"
+            style={{ ...at(drawn.lights.port), animationDelay: `${strobeDelay(plane.hex)}s` }}
+          />
+          <i
+            className="light strobe"
+            style={{ ...at(drawn.lights.starboard), animationDelay: `${strobeDelay(plane.hex)}s` }}
+          />
+        </>
+      )}
+      {glare > 0.08 && (
+        <i
+          className="glare"
+          style={{ ...at(drawn.lights.landing), opacity: Math.min(1, glare).toFixed(2) }}
+        />
+      )}
+      <span
+        className="craft-label"
+        style={
+          labelLeft
+            ? { right: labelAt, top: -labelAt * 0.6 - 18 * scale }
+            : { left: labelAt, top: -labelAt * 0.6 - 18 * scale }
+        }
+      >
+        {label(plane)}
+      </span>
     </div>
   );
 }
@@ -332,4 +423,25 @@ function strobeDelay(hex: string): number {
   let h = 0;
   for (const ch of hex) h = (h * 31 + ch.charCodeAt(0)) % 997;
   return -(h % 160) / 100;
+}
+
+// useTurnRates follows each plane's track from one report to the next: how fast it turns, smoothed, for its bank.
+function useTurnRates(planes: Plane[]): Map<string, number> {
+  const seen = useRef(new Map<string, { track: number; at: number; rate: number }>());
+  return useMemo(() => {
+    const out = new Map<string, number>();
+    for (const p of planes) {
+      if (p.track_deg === undefined) continue;
+      const at = Date.parse(p.at);
+      const prev = seen.current.get(p.hex);
+      let rate = prev?.rate ?? 0;
+      if (prev && at - prev.at > 900 && at - prev.at < 30_000) {
+        const turned = ((((p.track_deg - prev.track) % 360) + 540) % 360) - 180;
+        rate = Math.max(-6, Math.min(6, rate * 0.6 + (turned / ((at - prev.at) / 1000)) * 0.4));
+      }
+      if (!prev || at > prev.at) seen.current.set(p.hex, { track: p.track_deg, at, rate });
+      out.set(p.hex, rate);
+    }
+    return out;
+  }, [planes]);
 }

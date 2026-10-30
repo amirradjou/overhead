@@ -84,19 +84,23 @@ export default function Screen() {
                 : "community ADS-B feeds"}
             </span>
             <span>
-              Aircraft and routes from <Site name="adsbdb" label="adsbdb.com" />
+              Aircraft from <Site name="adsbdb" label="adsbdb.com" />, photos from{" "}
+              <Site name="planespotters.net" />
             </span>
-            <span>
-              Photos from <Site name="planespotters.net" />
-            </span>
-            {view?.weather && (
+            {(view?.weather || mapped) && (
               <span>
-                Weather from <Site name="open-meteo.com" />
-              </span>
-            )}
-            {mapped && (
-              <span>
-                Map © <Site name="OpenStreetMap" /> contributors
+                {view?.weather && (
+                  <>
+                    Weather from <Site name="open-meteo.com" />
+                  </>
+                )}
+                {view?.weather && mapped && ", map "}
+                {!view?.weather && mapped && "Map "}
+                {mapped && (
+                  <>
+                    © <Site name="OpenStreetMap" />
+                  </>
+                )}
               </span>
             )}
           </p>

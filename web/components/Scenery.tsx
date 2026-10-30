@@ -173,9 +173,11 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
           <stop offset="0.55" stopColor={mix(c.lakeFar, "#ffffff", night ? 0.05 : 0.3)} stopOpacity={haze} />
           <stop offset="1" stopColor={c.lakeFar} stopOpacity="0" />
         </linearGradient>
-        <linearGradient id="scrim" x1="0" y1="640" x2="0" y2="900" gradientUnits="userSpaceOnUse">
+        {/* Under the caption the view darkens, so its words read over buildings as well as water. */}
+        <linearGradient id="scrim" x1="0" y1="560" x2="0" y2="820" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#03060c" stopOpacity="0" />
-          <stop offset="1" stopColor="#03060c" stopOpacity="0.84" />
+          <stop offset="0.45" stopColor="#03060c" stopOpacity="0.62" />
+          <stop offset="1" stopColor="#03060c" stopOpacity="0.88" />
         </linearGradient>
         <pattern id="autumn" width="23" height="11" patternUnits="userSpaceOnUse">
           {/* Yellow, rust and red crowns among the green, scattered so no row or column shows. */}
@@ -279,7 +281,7 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
         </g>
       )}
       <rect x="-20" y={hy - 70} width="1040" height="130" fill="url(#haze)" />
-      <rect x="-20" y="640" width="1040" height="400" fill="url(#scrim)" />
+      <rect x="-20" y="560" width="1040" height="480" fill="url(#scrim)" />
     </svg>
   );
 }
