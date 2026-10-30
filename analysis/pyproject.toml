@@ -1,0 +1,40 @@
+[project]
+name = "overhead-stats"
+version = "0.1.0"
+description = "Passes and facts from overhead's history: DuckDB locally, the same model on Snowflake in M3"
+authors = [
+    { name = "amirradjou", email = "amir.radical.78@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=2.0",
+    "pandas>=3.1",
+    "pytz>=2026.6",
+]
+
+[project.scripts]
+overhead-stats = "overhead_stats.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
+]
+
+[tool.uv.build-backend]
+module-name = "overhead_stats"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# DuckDB's own DataFrame conversion trips a pandas 3.1 deprecation; it is not this package's to fix.
+filterwarnings = ["ignore:The inplace keyword in DataFrame.drop is deprecated"]

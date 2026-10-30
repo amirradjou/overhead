@@ -236,8 +236,9 @@ func runLive(ctx context.Context, args []string) error {
 func runHistory(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("history", flag.ContinueOnError)
 	dir := fs.String("dir", dataPath("history"), "directory for the batch files")
+	s3url := fs.String("s3", env("OVERHEAD_S3", ""), "write to s3://bucket/prefix instead of -dir (OVERHEAD_S3; AWS_* settings)")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: overhead history [-dir data/history]   (OVERHEAD_AMQP, OVERHEAD_DATA)")
+		fmt.Fprintln(fs.Output(), "usage: overhead history [-dir data/history | -s3 s3://bucket/prefix]   (OVERHEAD_AMQP, OVERHEAD_DATA)")
 		fs.PrintDefaults()
 	}
 	if err := parse(fs, args); err != nil {
@@ -246,13 +247,22 @@ func runHistory(ctx context.Context, args []string) error {
 		}
 		return err
 	}
-	w := &history.Writer{Store: history.DirStore{Root: *dir}}
+	var store history.Store = history.DirStore{Root: *dir}
+	where := *dir
+	if *s3url != "" {
+		s3store, err := history.NewS3Store(ctx, *s3url, env("OVERHEAD_S3_ENDPOINT", ""))
+		if err != nil {
+			return usageError{"overhead history: -s3: " + err.Error()}
+		}
+		store, where = s3store, *s3url
+	}
+	w := &history.Writer{Store: store}
 	report := func(msg string) {
 		s := w.Stats()
 		slog.Info(msg, "batches", s.Batches, "events", s.Events, "failures", s.Failures, "rejected", s.Rejected)
 	}
 	go every(ctx, 5*time.Minute, func() { report("history") })
-	slog.Info("writing history", "dir", *dir)
+	slog.Info("writing history", "to", where)
 	// The prefetch holds well over a minute of positions, so a batch is never starved of its own messages.
 	err := bus.Consume(ctx, amqpURL(), "overhead-history", bus.QueueHistory, 5000, w.Session)
 	report("stopped")
