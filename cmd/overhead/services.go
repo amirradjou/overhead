@@ -200,9 +200,11 @@ func runLive(ctx context.Context, args []string) error {
 	})
 	wg.Go(func() {
 		every(ctx, 10*time.Minute, func() {
-			cov := state.Coverage()
+			cov, pred := state.Coverage(), state.Predictions()
 			slog.Info("coverage", "flights", cov.Flights, "with_type", cov.WithType, "with_route", cov.WithRoute,
-				"share_with_both", fmt.Sprintf("%.1f%%", 100*cov.Share), "streams", srv.Clients(), "positions", state.Received())
+				"share_with_both", fmt.Sprintf("%.1f%%", 100*cov.Share), "streams", srv.Clients(), "positions", state.Received(),
+				"predictions", pred.Checked, "within_minute", pred.WithinMinute, "missed", pred.Missed,
+				"median_error_s", fmt.Sprintf("%.0f", pred.MedianErrorSec))
 		})
 	})
 

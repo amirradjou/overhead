@@ -14,8 +14,8 @@ import (
 // to patch, and a reconnect is caught up by the next message.
 const DefaultEvery = 2 * time.Second
 
-// Server serves the picture: GET /api/now (JSON), /api/events (Server-Sent Events), /api/coverage, /healthz, and the
-// screen's static files at / when Web is set.
+// Server serves the picture: GET /api/now (JSON), /api/events (Server-Sent Events), /api/coverage, /api/predictions,
+// /healthz, and the screen's static files at / when Web is set.
 type Server struct {
 	State *State
 	Every time.Duration
@@ -32,6 +32,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/now", s.now)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/coverage", s.coverage)
+	mux.HandleFunc("GET /api/predictions", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, s.State.Predictions())
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
 	if s.Web != nil {
 		mux.Handle("GET /", s.Web)
@@ -139,13 +142,15 @@ func (s *Server) Run(ctx context.Context) {
 			return
 		case <-tick.C:
 		}
+		// The view is worked out every tick even with no screen watching, so the prediction tally keeps counting.
+		view := s.State.View(s.clock())
 		s.mu.Lock()
 		n := len(s.clients)
 		s.mu.Unlock()
 		if n == 0 {
 			continue
 		}
-		data, err := json.Marshal(s.State.View(s.clock()))
+		data, err := json.Marshal(view)
 		if err != nil {
 			slog.Error("encode snapshot", "err", err)
 			continue

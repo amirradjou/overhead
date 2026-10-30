@@ -43,6 +43,10 @@ type State struct {
 	flights  map[string]*flight
 	received uint64
 	pruned   time.Time
+
+	predicted                           map[string]prediction
+	predErrors                          []float64
+	predChecked, predWithin, predMissed int
 }
 
 // flight is one commercial flight's pass through the circle, for the coverage tally.
@@ -263,6 +267,7 @@ func (s *State) View(now time.Time) View {
 	if now.Local().Format(time.DateOnly) == s.day {
 		v.Today = len(s.today)
 	}
+	s.trackPredictions(v)
 	return v
 }
 
