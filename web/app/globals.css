@@ -1,21 +1,31 @@
 /* overhead's screen: the sky through your window. The sky is the colour of the sky outside (the phase follows the
    sun at home), the rooftops opposite are the darkest thing on screen, and planes are what they look like from the
    ground: navigation lights after dark, small silhouettes by day. One accent, amber like a distant landing light,
-   marks what is coming. The root size follows the viewport width, so a 1080p TV gets a 28 px base. */
+   marks what is coming.
+
+   Read from the sofa: the root size follows the screen (28 px on a 1080p TV, whatever the browser's CSS width), no
+   text is smaller than 0.82rem (23 px at 1080p, the tvOS minimum), words that sit on the sky get a feathered dark
+   plate, and every word keeps inside the TV-safe area, where an overscanning TV cannot crop it. */
 
 :root {
   --text: rgb(255 255 255 / 0.92);
-  --text-soft: rgb(255 255 255 / 0.62);
-  --text-faint: rgb(255 255 255 / 0.34);
+  --text-soft: rgb(255 255 255 / 0.74);
+  --text-faint: rgb(255 255 255 / 0.56); /* 4.6:1 on the night roofs, the darkest place it sits */
   --amber: #ffcf70;
   --port: #ff4b3e;
   --starboard: #3ee08a;
   --roof: #03060c;
   --roofline: 72%;
+  /* The TV-safe area: tvOS insets 80 pt at the sides and 60 at the top and bottom of 1920×1080. `?safe=` overrides. */
+  --safe-x: 4.2vw;
+  --safe-y: 5.6vh;
+  /* Behind words on the sky: dark, translucent, feathered into the sky by a shadow of the same colour. */
+  --plate: rgb(4 10 20 / 0.46);
 }
 
 html {
-  font-size: clamp(16px, 1.46vw, 44px);
+  font-size: 1.46vw; /* Chromium before 79 has no min() */
+  font-size: min(1.46vw, 2.6vh);
 }
 
 html,
@@ -37,6 +47,11 @@ h1,
 p,
 figure {
   margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 .screen {
@@ -172,22 +187,31 @@ figure {
   top: -0.9rem;
 }
 
+/* Words on the sky: a plane's name and the cue. The plate keeps them readable on a bright sky and all but
+   disappears on a dark one. */
+.craft-label,
+.cue-text {
+  background: var(--plate);
+  box-shadow: 0 0 0.5rem 0.3rem var(--plate);
+  border-radius: 0.5rem;
+}
 .craft-label {
   position: absolute;
-  left: 0.9rem;
-  top: -1.25rem;
+  left: 1rem;
+  top: -1.5rem;
+  padding: 0 0.15rem;
   white-space: nowrap;
-  font-size: 0.58rem;
+  font-size: 0.84rem;
   color: var(--text-soft);
-  text-shadow: 0 0 0.4rem rgb(0 0 0 / 0.6);
 }
 .craft.is-featured .craft-label {
-  font-size: 0.72rem;
+  font-size: 0.95rem;
   color: var(--text);
 }
-.sky-day .craft-label {
-  color: rgb(12 22 32 / 0.72);
-  text-shadow: none;
+/* Near the right edge the name goes on the plane's left, so it stays on screen. */
+.craft.label-left .craft-label {
+  left: auto;
+  right: 1rem;
 }
 
 /* Where the next plane comes into view. */
@@ -197,7 +221,7 @@ figure {
   display: flex;
   align-items: center;
   transform: translate(-50%, -50%);
-  font-size: 0.58rem;
+  font-size: 0.84rem;
   color: var(--amber);
   animation: cue 3.2s ease-in-out infinite;
 }
@@ -205,6 +229,7 @@ figure {
   transform: translate(0, -50%);
 }
 .cue-text {
+  padding: 0 0.15rem;
   white-space: nowrap;
 }
 .cue-right {
@@ -212,18 +237,19 @@ figure {
   transform: translate(-100%, -50%);
 }
 .cue-mark {
-  margin-right: 0.4rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-top: 0.12rem solid var(--amber);
-  border-right: 0.12rem solid var(--amber);
+  flex: none;
+  margin-right: 0.5rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-top: 0.14rem solid var(--amber);
+  border-right: 0.14rem solid var(--amber);
 }
 /* The chevron points into the window from the side the plane comes from. */
 .cue-left .cue-mark {
   transform: rotate(45deg);
 }
 .cue-right .cue-mark {
-  margin: 0 0 0 0.4rem;
+  margin: 0 0 0 0.5rem;
   transform: rotate(-135deg);
 }
 .cue-rooftops .cue-mark {
@@ -233,15 +259,15 @@ figure {
   transform: rotate(135deg);
 }
 .cue-distance .cue-mark {
-  width: 0.35rem;
-  height: 0.35rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border: 0;
   border-radius: 50%;
   background: var(--amber);
 }
 @keyframes cue {
   50% {
-    opacity: 0.45;
+    opacity: 0.55;
   }
 }
 
@@ -249,12 +275,12 @@ figure {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(var(--roofline) + 0.35rem);
+  top: calc(var(--roofline) + 0.4rem);
 }
 .compass span {
   position: absolute;
   transform: translateX(-50%);
-  font-size: 0.5rem;
+  font-size: 0.82rem;
   color: var(--text-faint);
 }
 
@@ -265,29 +291,31 @@ figure {
 .overlay {
   pointer-events: none;
 }
+.overlay a {
+  pointer-events: auto;
+}
 .sky-night .overlay {
-  opacity: 0.82; /* dimmer after dark */
+  opacity: 0.86; /* dimmer after dark */
 }
 
 .clock {
   position: absolute;
-  top: 1.1rem;
-  left: 1.6rem;
+  top: var(--safe-y);
+  left: var(--safe-x);
   font-size: 1.5rem;
-  font-weight: 300;
-  color: var(--text-soft);
+  line-height: 1;
+  color: rgb(255 255 255 / 0.62); /* static and always on: kept dim */
 }
 .clock-status {
   margin-left: 0.8rem;
-  font-size: 0.6rem;
-  font-weight: 400;
+  font-size: 0.82rem;
   color: var(--amber);
 }
 
 .overview {
   position: absolute;
-  top: 1.1rem;
-  right: 1.6rem;
+  top: var(--safe-y);
+  right: var(--safe-x);
   width: 6.5rem;
   height: 6.5rem;
 }
@@ -300,12 +328,14 @@ figure {
   fill: rgb(255 255 255 / 0.09);
 }
 .overview-north {
-  font-size: 7px;
+  font-size: 13px;
+  font-weight: 700;
   fill: var(--text-faint);
   text-anchor: middle;
+  dominant-baseline: central;
 }
 .overview-plane {
-  fill: rgb(255 255 255 / 0.32);
+  fill: rgb(255 255 255 / 0.4);
 }
 .overview-plane.is-in-view {
   fill: #fff;
@@ -315,16 +345,18 @@ figure {
 }
 .overview-home {
   fill: none;
-  stroke: var(--amber);
+  stroke: var(--text-soft);
   stroke-width: 1;
 }
 
 /* The caption sits over the rooftops: dark behind it whatever the sky is doing. */
 .caption {
   position: absolute;
-  left: 1.6rem;
-  right: 12rem;
-  bottom: 1.4rem;
+  left: var(--safe-x);
+  right: calc(var(--safe-x) + 16rem);
+  bottom: var(--safe-y);
+  text-shadow: 0 0 0.6rem var(--roof); /* where a lower roof lets the sky through */
+  transition: opacity 1s;
 }
 .caption-body {
   animation: fade-in 0.9s ease-out both;
@@ -343,23 +375,32 @@ figure {
   flex: none;
   position: relative;
   margin-right: 1rem;
+  text-shadow: none;
 }
 .photo img {
   display: block;
-  width: 7.8rem; /* 3:2, set as two lengths: aspect-ratio needs Chromium 88 */
-  height: 5.2rem;
+  width: 9.6rem; /* 3:2, set as two lengths: aspect-ratio needs Chromium 88 */
+  height: 6.4rem;
   object-fit: cover;
-  border-radius: 0.15rem;
-  opacity: 0.9;
+  border-radius: 0.2rem;
+  opacity: 0.92;
 }
+/* The photographer's credit, on the photo itself, over a shade so it reads on any picture. */
 .photo figcaption {
-  margin-top: 0.15rem;
-  font-size: 0.4rem;
-  color: var(--text-faint);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.9rem 0.4rem 0.25rem;
+  border-radius: 0 0 0.2rem 0.2rem;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0), rgb(0 0 0 / 0.72) 55%);
+  font-size: 0.82rem;
+  line-height: 1.15;
+  color: var(--text-soft);
 }
 
 .notable {
-  font-size: 0.6rem;
+  font-size: 0.86rem;
   color: var(--amber);
   margin-bottom: 0.15rem;
 }
@@ -370,51 +411,49 @@ figure {
   color: var(--text);
 }
 .flight.is-quiet {
-  font-weight: 300;
+  font-weight: 400;
 }
 .route {
   margin-top: 0.2rem;
-  font-size: 1rem;
+  font-size: 1.05rem;
   color: var(--text);
 }
 .facts {
   margin-top: 0.3rem;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   color: var(--text-soft);
 }
 .landing {
   margin-top: 0.2rem;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   color: var(--amber);
 }
 .caption-foot {
-  margin-top: 0.55rem;
-  font-size: 0.58rem;
+  margin-top: 0.6rem;
+  font-size: 0.86rem;
   color: var(--text-faint);
 }
 .fact {
-  font-size: 0.75rem;
   color: var(--text-soft);
   animation: fade-in 1.2s ease-out both;
 }
 
+/* Who the data comes from, as the sources' terms ask: each named by its address, readable from the sofa, dim. */
 .credits {
   position: absolute;
-  right: 1.6rem;
-  bottom: 0.7rem;
-  max-width: 11rem;
+  right: var(--safe-x);
+  bottom: var(--safe-y);
+  width: 15rem;
   text-align: right;
-  font-size: 0.4rem;
-  line-height: 1.35;
+  font-size: 0.82rem;
+  line-height: 1.3;
   color: var(--text-faint);
+  text-shadow: 0 0 0.6rem var(--roof);
 }
 
 .is-stale .caption,
 .is-stale .craft {
   opacity: 0.5;
-}
-.caption {
-  transition: opacity 1s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -433,8 +472,7 @@ figure {
     font-size: 15px;
   }
   .caption {
-    right: 1rem;
-    left: 1rem;
+    right: var(--safe-x);
   }
   .overview,
   .credits {

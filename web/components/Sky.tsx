@@ -120,7 +120,7 @@ function Craft({ plane, w, size, dark, featured }: CraftProps) {
   const y = (pos.y * size.height).toFixed(1);
   return (
     <div
-      className={`craft${featured ? " is-featured" : ""}`}
+      className={`craft${featured ? " is-featured" : ""}${pos.x > 0.8 ? " label-left" : ""}`}
       style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
     >
       <div className="craft-body" style={{ transform: `rotate(${angle.current}deg)` }}>
@@ -147,10 +147,21 @@ function Cue({ plane, w }: { plane: Plane; w: Window }) {
   const c = plane.coming;
   if (!c) return null;
   const at = toScreen(w, c.offset_deg, c.elevation_deg);
-  const x = c.side === "left" ? 0.015 : c.side === "right" ? 0.985 : Math.min(0.95, Math.max(0.05, at.x));
-  const y = c.side === "rooftops" ? roofline - 0.04 : c.side === "above" ? 0.04 : Math.max(0.06, at.y);
+  // At the edge it comes from, inside the TV-safe area so an overscanning TV cannot crop it.
+  const left =
+    c.side === "left"
+      ? "var(--safe-x)"
+      : c.side === "right"
+        ? "calc(100% - var(--safe-x))"
+        : `${Math.min(0.85, Math.max(0.15, at.x)) * 100}%`;
+  const top =
+    c.side === "rooftops"
+      ? `${(roofline - 0.04) * 100}%`
+      : c.side === "above"
+        ? "calc(var(--safe-y) + 1rem)"
+        : `max(calc(var(--safe-y) + 1rem), ${at.y * 100}%)`;
   return (
-    <div className={`cue cue-${c.side}`} style={{ left: `${x * 100}%`, top: `${y * 100}%` }}>
+    <div className={`cue cue-${c.side}`} style={{ left, top }}>
       <span className="cue-mark" />
       <span className="cue-text">
         {label(plane)} {c.in_s < 45 ? "any moment" : `in ${Math.round(c.in_s / 60)} min`}

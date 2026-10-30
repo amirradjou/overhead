@@ -18,6 +18,7 @@ export default function Screen() {
   const { view, status } = useLiveView();
   const now = useNow(20_000);
   const drift = useDrift();
+  useSafeArea();
 
   const phase = view && now ? skyPhase(sunElevation(view.center.lat, view.center.lon, now)) : "night";
   const planes = view?.planes ?? [];
@@ -64,6 +65,17 @@ function useNow(interval: number): Date | null {
     return () => window.clearInterval(id);
   }, [interval]);
   return now;
+}
+
+// useSafeArea lets a TV that crops more than most widen the margins every word keeps to: `?safe=8` keeps text 8% of
+// the screen in from each edge.
+function useSafeArea() {
+  useEffect(() => {
+    const safe = Number(new URLSearchParams(window.location.search).get("safe"));
+    if (!safe || safe < 0 || safe > 20) return;
+    document.documentElement.style.setProperty("--safe-x", `${safe}vw`);
+    document.documentElement.style.setProperty("--safe-y", `${safe}vh`);
+  }, []);
 }
 
 // useDrift moves the scene to a new spot within a few pixels every few minutes; the CSS eases it there slowly.
