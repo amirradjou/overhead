@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { shown } from "@/lib/airport";
 import { label } from "@/lib/format";
 import {
   compassTicks,
+  horizonY,
   inFrame,
+  looksDown,
   nearestTurn,
   offsetFrom,
   roofline,
   rooftops,
+  sill,
   toScreen,
   screenTop,
 } from "@/lib/sky";
@@ -29,18 +33,21 @@ interface Props {
 const trailPoints = 15; // 30 s of positions at one snapshot every 2 s
 
 // The window: the sky as it is outside (the light round the sun, the real stars and the moon where they are), the
-// rooftops opposite, the planes in view and a cue where the next one appears.
+// rooftops opposite (or, from high up, the water below the horizon), the planes in view and a cue where the next one
+// appears.
 export default function Sky({ view, now, phase, sun, featuredHex, next }: Props) {
-  const roofs = useMemo(() => rooftops(), []);
   // A new window object arrives with every snapshot; the same window, the same object, so the sky is not redone.
   const snapshotWindow = view?.window;
   const w = useMemo(
     () => snapshotWindow,
     [snapshotWindow?.azimuth_deg, snapshotWindow?.fov_deg, snapshotWindow?.min_elevation_deg],
   );
+  const high = w ? looksDown(w) : false;
+  const roofs = useMemo(() => (high ? sill() : rooftops()), [high]);
+  const horizon = w ? horizonY(w) : undefined;
   const lat = view?.center.lat;
   const lon = view?.center.lon;
-  const visible = useMemo(() => view?.planes.filter((p) => p.in_view) ?? [], [view]);
+  const visible = useMemo(() => shown(view).filter((p) => p.in_view), [view]);
   const trails = useTrails(visible, w);
   const size = useScreenSize();
   const dark = phase === "night" || phase === "twilight";
@@ -54,7 +61,7 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
     });
     const m = moonAt(lat, lon, now);
     const moonOff = offsetFrom(w, m.az);
-    const moon = inFrame(w, moonOff, m.alt) ? { ...m, ...toScreen(w, moonOff, m.alt) } : null;
+    const moon = m.alt > 0 && inFrame(w, moonOff, m.alt) ? { ...m, ...toScreen(w, moonOff, m.alt) } : null;
     const sunOff = offsetFrom(w, sun.az);
     const sunY = sun.alt > w.min_elevation_deg ? toScreen(w, sunOff, sun.alt).y : roofline;
     return { stars, moon, glow: sunGlow(sun.alt, sunOff, w.fov_deg, sunY), limit: magnitudeLimit(sun.alt) };
@@ -90,6 +97,8 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
         </svg>
       )}
       {heavens?.moon && <MoonDisc moon={heavens.moon} dark={dark} />}
+      {/* Below the horizon, under the planes: from high up they are seen against the water or the city. */}
+      {horizon !== undefined && <div className="below-horizon" style={{ top: `${horizon * 100}%` }} />}
       {w && (
         <svg className="trails" viewBox="0 0 1000 1000" preserveAspectRatio="none">
           {/* Up to where the plane was at the last snapshot: it glides on from there, so the trail follows it. */}
@@ -116,7 +125,11 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
         <path d={roofs} />
       </svg>
       {w && (
-        <div className="compass">
+        // Compass points stand on the horizon: the roofline, or from high up the line where sky meets water.
+        <div
+          className="compass"
+          style={horizon === undefined ? undefined : { top: `calc(${horizon * 100}% - 1.7rem)` }}
+        >
           {compassTicks(w).map((t) => (
             <span key={t.label} style={{ left: `${t.x * 100}%` }}>
               {t.label}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   compassTicks,
+  horizonY,
   inFrame,
+  looksDown,
   nearestTurn,
   offsetFrom,
   overviewTurn,
@@ -9,6 +11,7 @@ import {
   roofline,
   rooftops,
   seeded,
+  sill,
   toScreen,
   screenTop,
   topDeg,
@@ -72,6 +75,22 @@ describe("the window on screen", () => {
     expect(inFrame(south, 46, 30)).toBe(false);
     expect(inFrame(south, 0, 4)).toBe(false); // behind the roofs
     expect(inFrame(south, 0, topDeg + 1)).toBe(false); // above the top of the frame
+  });
+
+  it("from high up, draws the horizon above the bottom of the window and a flat sill", () => {
+    const high: Window = {
+      azimuth_deg: 163,
+      fov_deg: 100,
+      min_elevation_deg: -5,
+      max_elevation_deg: 30,
+      home_elevation_m: 218,
+    };
+    expect(looksDown(high)).toBe(true);
+    expect(looksDown(south)).toBe(false);
+    expect(horizonY(south)).toBeUndefined();
+    // 0° is a seventh of the way up from -5° to 30°.
+    expect(horizonY(high)).toBeCloseTo(roofline * (1 - 5 / 35));
+    expect(sill()).toBe(`M-40,1040 L-40,${roofline * 1000} L1040,${roofline * 1000} L1040,1040 Z`);
   });
 
   it("draws the same rooftops every time, never above the roofline", () => {

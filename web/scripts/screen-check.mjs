@@ -44,6 +44,8 @@ const scenes = [
   { name: "day", at: "2026-10-30T17:00:00Z", traffic: "busy" },
   { name: "golden", at: "2026-10-30T21:45:00Z", traffic: "busy" },
   { name: "twilight", at: "2026-10-30T22:25:00Z", traffic: "empty" },
+  // A high window following Billy Bishop: a landing below the horizon, a departure, a helicopter close by.
+  { name: "island", at: "2026-10-30T17:00:00Z", traffic: "island" },
 ];
 
 const airports = {
@@ -52,7 +54,177 @@ const airports = {
   YYZ: { iata: "YYZ", city: "Toronto", lat: 43.6777, lon: -79.6248 },
   SFO: { iata: "SFO", city: "San Francisco", lat: 37.6213, lon: -122.379 },
   ATL: { iata: "ATL", city: "Atlanta", lat: 33.6407, lon: -84.4277 },
+  BOS: { icao: "KBOS", iata: "BOS", city: "Boston", lat: 42.3643, lon: -71.0052 },
+  YOW: { icao: "CYOW", iata: "YOW", city: "Ottawa", lat: 45.3225, lon: -75.6692 },
+  YQT: { icao: "CYQT", iata: "YQT", city: "Thunder Bay", lat: 48.3719, lon: -89.3239 },
+  YTZ: { icao: "CYTZ", iata: "YTZ", city: "Toronto", lat: 43.6275, lon: -79.3962 },
 };
+
+// The island scene's window: the 48th floor, facing south-south-east, seeing down to the island airport.
+const highWindow = {
+  azimuth_deg: 163,
+  fov_deg: 100,
+  min_elevation_deg: -10,
+  max_elevation_deg: 30,
+  home_elevation_m: 218,
+};
+const ytz = {
+  icao: "CYTZ",
+  iata: "YTZ",
+  name: "Billy Bishop",
+  lat: 43.6275,
+  lon: -79.3962,
+  elevation_ft: 252,
+  runway_in_use: "26",
+  arrivals_today: 31,
+  departures_today: 29,
+};
+
+// islandPlane is a plane at Billy Bishop: in view of the high window when inView, and doing `airport` there.
+function islandPlane(t, p, airport, extra = {}) {
+  const base = plane(t, p);
+  return {
+    ...base,
+    bearing_deg: highWindow.azimuth_deg + base.offset_deg,
+    in_view: extra.in_view ?? true,
+    focus: true,
+    ...(airport && { airport }),
+    ...extra,
+    info: { ...base.info, registration: p.reg },
+  };
+}
+
+function islandSnapshot(t) {
+  const dash8 = { type: "DH8D", typeName: "DHC-8-402 Dash 8", maker: "De Havilland Canada" };
+  return {
+    at: new Date().toISOString(),
+    center: { lat: 43.6397, lon: -79.3921 },
+    radius_km: 60,
+    window: highWindow,
+    focused: true,
+    near_km: 3,
+    airport: ytz,
+    planes: [
+      islandPlane(
+        t,
+        {
+          hex: "c0a001",
+          callsign: "PTR2943",
+          airline: "Porter Airlines",
+          from: "BOS",
+          to: "YTZ",
+          ...dash8,
+          reg: "C-GLQB",
+          alt: 700,
+          kt: 120,
+          fpm: -700,
+          km: 2.2,
+          lat: 43.63,
+          lon: -79.36,
+          offset: 25,
+          elevation: -4,
+          dOffset: -2,
+          dElevation: -0.3,
+          photo: true,
+        },
+        { op: "arriving", phase: "final", runway: "26", distance_km: 2.6, height_ft: 450, in_min: 0.7 },
+      ),
+      islandPlane(
+        t,
+        {
+          hex: "c0a002",
+          callsign: "PTR2635",
+          airline: "Porter Airlines",
+          from: "YTZ",
+          to: "YQT",
+          ...dash8,
+          reg: "C-GKQD",
+          alt: 3000,
+          kt: 190,
+          fpm: 1500,
+          km: 8,
+          lat: 43.6,
+          lon: -79.48,
+          offset: -30,
+          elevation: 6,
+          dOffset: -1,
+          dElevation: 0.4,
+        },
+        { op: "departing", phase: "climbing", distance_km: 7.5, height_ft: 2750, ago_min: 2.1 },
+      ),
+      islandPlane(
+        t,
+        {
+          hex: "c0a003",
+          callsign: "CGKLD",
+          type: "R44",
+          reg: "C-GKLD",
+          alt: 900,
+          kt: 80,
+          fpm: 0,
+          km: 1.2,
+          lat: 43.632,
+          lon: -79.38,
+          offset: 40,
+          elevation: 2,
+          dOffset: 0.5,
+          dElevation: 0,
+        },
+        undefined,
+        { near: true, info: { hex: "c0a003", registration: "C-GKLD", type_code: "R44" } },
+      ),
+      islandPlane(
+        t,
+        {
+          hex: "c0a004",
+          callsign: "JZA7869",
+          airline: "Air Canada Jazz",
+          from: "YOW",
+          to: "YTZ",
+          ...dash8,
+          reg: "C-GGOK",
+          alt: 4000,
+          kt: 210,
+          fpm: -900,
+          km: 16,
+          lat: 43.7,
+          lon: -79.2,
+          offset: -70,
+          elevation: 4,
+          dOffset: 0,
+          dElevation: 0,
+        },
+        { op: "arriving", phase: "approach", distance_km: 17, height_ft: 3750, in_min: 4.2 },
+        { in_view: false, coming: { in_s: 120, side: "left", offset_deg: -50, elevation_deg: 3 } },
+      ),
+      // Far off and not at the airport: a focused screen leaves it out.
+      {
+        ...plane(t, {
+          hex: "c0a005",
+          callsign: "ACA855",
+          airline: "Air Canada",
+          from: "YVR",
+          to: "YYZ",
+          type: "A333",
+          alt: 30000,
+          kt: 450,
+          fpm: 0,
+          km: 30,
+          lat: 43.5,
+          lon: -79.2,
+          offset: 0,
+          elevation: 15,
+          dOffset: 1,
+          dElevation: 0,
+        }),
+        in_view: true,
+      },
+    ],
+    today: 42,
+    sources: ["adsb.fi", "adsb.lol"],
+    facts: [],
+  };
+}
 
 // A plane crossing the window: it starts at (offset, elevation) and moves (dOffset, dElevation) degrees per 10 s,
 // as the real `motion` field says.
@@ -98,6 +270,7 @@ function plane(t, p) {
 }
 
 function snapshot(traffic, t) {
+  if (traffic === "island") return islandSnapshot(t);
   const planes = [];
   if (traffic === "busy") {
     planes.push(
@@ -440,7 +613,7 @@ async function check(chrome) {
       writeFileSync(file, Buffer.from(shot.data, "base64"));
 
       const problems = [...report.problems, ...errors.map((e) => `script error: ${e}`)];
-      const wantCrafts = scene.traffic === "busy" ? 3 : 0;
+      const wantCrafts = scene.traffic === "busy" || scene.traffic === "island" ? 3 : 0;
       if (report.crafts !== wantCrafts)
         problems.push(`${report.crafts} planes on screen, want ${wantCrafts}`);
       if (layouts > 12) problems.push(`${layouts} layouts in 6 s: something animates layout`); // a few per snapshot

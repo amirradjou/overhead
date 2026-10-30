@@ -47,6 +47,34 @@ export interface Window {
   home_elevation_m: number;
 }
 
+/** What a plane is doing at the airport the screen follows (overhead live -airport). */
+export interface AtAirport {
+  /** By its route, or by how it moves; "ground" is moving on the airport's ground with no route to tell which. */
+  op: "arriving" | "departing" | "ground";
+  phase:
+    "approach" | "final" | "landing" | "taxiing" | "arrived" | "gate" | "takeoff" | "climbing" | "runway";
+  runway?: string;
+  distance_km: number;
+  /** Height above the airport, when airborne. */
+  height_ft?: number;
+  /** Minutes to touchdown (arriving), or since take-off (departing), at the speed it flies now. */
+  in_min?: number;
+  ago_min?: number;
+}
+
+/** The airport the screen follows, and its day. */
+export interface FollowedAirport {
+  icao: string;
+  iata: string;
+  name: string;
+  lat: number;
+  lon: number;
+  elevation_ft: number;
+  runway_in_use?: string;
+  arrivals_today: number;
+  departures_today: number;
+}
+
 /** When and where a plane comes into view. */
 export interface Coming {
   in_s: number;
@@ -86,6 +114,11 @@ export interface Plane {
   coming?: Coming;
   /** Degrees right and up across the window over the next 10 s. */
   motion?: { offset_deg: number; elevation_deg: number };
+  airport?: AtAirport;
+  /** Very close to the window (within the view's near_km, in a straight line). */
+  near?: boolean;
+  /** One of the planes a focused screen shows. */
+  focus?: boolean;
 }
 
 export interface View {
@@ -98,4 +131,8 @@ export interface View {
   sources: string[];
   /** Sentences about the history, for between planes. */
   facts: string[];
+  /** Show only the planes marked focus: at the followed airport, or very close to the window. */
+  focused?: boolean;
+  near_km?: number;
+  airport?: FollowedAirport;
 }

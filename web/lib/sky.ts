@@ -14,6 +14,19 @@ export function screenTop(w: Window): number {
 /** Where the rooftops end and the sky begins, as a fraction of the screen's height from the top. */
 export const roofline = 0.72;
 
+/**
+ * Whether the window looks down past the horizon, as from high up with nothing opposite: then the bottom of the
+ * screen is water or land below the horizon, not rooftops.
+ */
+export function looksDown(w: Window): boolean {
+  return w.min_elevation_deg < 0;
+}
+
+/** The horizon's height on screen, as a fraction from the top, for a window that looks down past it. */
+export function horizonY(w: Window): number | undefined {
+  return looksDown(w) ? toScreen(w, 0, 0).y : undefined;
+}
+
 /** Screen position, each 0 to 1, of something seen offsetDeg right of the window's centre and elevationDeg up. */
 export function toScreen(w: Window, offsetDeg: number, elevationDeg: number): { x: number; y: number } {
   const x = 0.5 + offsetDeg / w.fov_deg;
@@ -116,4 +129,11 @@ export function rooftops(seed = 7): string {
   }
   pts.push([1000 + bleed, 1000 + bleed]);
   return "M" + pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" L") + " Z";
+}
+
+/** The window's sill, flat along the roofline, for a window with nothing standing opposite (see looksDown). */
+export function sill(): string {
+  const bleed = 40;
+  const top = roofline * 1000;
+  return `M${-bleed},${1000 + bleed} L${-bleed},${top} L${1000 + bleed},${top} L${1000 + bleed},${1000 + bleed} Z`;
 }
