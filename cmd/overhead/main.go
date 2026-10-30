@@ -15,13 +15,20 @@ import (
 const usage = `usage: overhead <command> [flags]
 
 commands:
-  watch     poll the feeds and show the planes round home as a live table
+  watch     poll the feeds and show the planes round home as a live table (no broker needed)
+  poll      poll the feeds and publish position events and enrichment jobs to RabbitMQ
+  enrich    work the enrichment queue: type, operator and route (adsbdb), photo (planespotters)
+  live      keep the live picture and serve it to the screen: /api/now, /api/events (SSE)
+  history   write the positions to one-minute batch files
+  verify    check the batch files for lost or duplicated events
   version   print the version
 
 Run "overhead <command> -h" for a command's flags.
 
 environment:
   OVERHEAD_LAT, OVERHEAD_LON   the centre of the circle (default: Toronto Pearson)
+  OVERHEAD_AMQP                RabbitMQ (default amqp://overhead:overhead@localhost:5673/, compose.yaml)
+  OVERHEAD_DATA                where enrich and history keep their files (default ./data)
 `
 
 func main() {
@@ -43,6 +50,16 @@ func main() {
 		fmt.Println(buildinfo.String())
 	case "watch":
 		err = runWatch(ctx, os.Args[2:])
+	case "poll":
+		err = runPoll(ctx, os.Args[2:])
+	case "enrich":
+		err = runEnrich(ctx, os.Args[2:])
+	case "live":
+		err = runLive(ctx, os.Args[2:])
+	case "history":
+		err = runHistory(ctx, os.Args[2:])
+	case "verify":
+		err = runVerify(ctx, os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

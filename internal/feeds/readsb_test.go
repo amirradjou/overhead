@@ -178,11 +178,20 @@ func TestFeedTextCannotDriveTheTerminal(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got %+v, %v", got, err)
 	}
-	if got[0].Callsign != "ACA1[2J]0;pwned" || got[0].Registration != "C-GZQU" {
+	// The callsign fails ADS-B's alphabet outright; the registration keeps its printable part.
+	if got[0].Callsign != "" || got[0].Registration != "C-GZQU" {
 		t.Fatalf("control characters kept: %q %q", got[0].Callsign, got[0].Registration)
 	}
 	if r := refusal([]byte("{\"error\":\"no\x1b[31m way\"}")); strings.ContainsRune(r, 0x1b) {
 		t.Fatalf("refusal kept an escape: %q", r)
+	}
+}
+
+func TestCallsign(t *testing.T) {
+	for in, want := range map[string]string{"ACA101  ": "ACA101", "@@@@@@@@": "", "ACA1@@  ": "", "": "", "  ": "", "c-gabc": "", "N123AB": "N123AB"} {
+		if got := callsign(in); got != want {
+			t.Errorf("callsign(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

@@ -36,3 +36,6 @@ CLAUDE.md
 
 # build output
 bin/
+
+# local runtime data (enrichment cache, history batches)
+data/
