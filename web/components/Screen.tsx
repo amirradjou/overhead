@@ -61,6 +61,7 @@ export default function Screen() {
             facts={view?.facts ?? []}
             now={now}
             status={status}
+            home={view ? { lat: view.center.lat, lon: view.center.lon, window: view.window } : undefined}
           />
           <p className="credits">
             <span>

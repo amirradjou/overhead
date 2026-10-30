@@ -289,17 +289,22 @@ a {
   }
 }
 
+/* The compass points stand on the roofline, as a planetarium marks the horizon, leaving the roofs to the caption. */
 .compass {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(var(--roofline) + 0.4rem);
+  top: calc(var(--roofline) - 1.7rem);
 }
 .compass span {
   position: absolute;
   transform: translateX(-50%);
+  padding: 0 0.15rem;
   font-size: 0.82rem;
-  color: var(--text-faint);
+  color: var(--text-soft);
+  background: var(--plate);
+  box-shadow: 0 0 0.5rem 0.3rem var(--plate);
+  border-radius: 0.5rem;
 }
 
 /* The scene drifts a few pixels every few minutes, slowly enough not to be seen moving. */
@@ -428,7 +433,7 @@ a {
 .flight {
   font-size: 2.1rem;
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   color: var(--text);
 }
 .flight.is-quiet {
@@ -439,8 +444,44 @@ a {
   font-size: 1.05rem;
   color: var(--text);
 }
+/* The route line is the trip: a hairline under it from origin to destination, the part flown brighter, a mark
+   where the plane is now. */
+.route-trip {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.35rem;
+}
+.trip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0.1rem;
+  background: rgb(255 255 255 / 0.22);
+}
+.trip-flown {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--text-soft);
+}
+.trip-here {
+  position: absolute;
+  top: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin: -0.21rem 0 0 -0.21rem;
+  border-radius: 50%;
+  background: var(--text);
+}
+.progress {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
 .facts {
-  margin-top: 0.3rem;
+  margin-top: 0.15rem;
   font-size: 0.9rem;
   color: var(--text-soft);
 }
@@ -450,7 +491,7 @@ a {
   color: var(--amber);
 }
 .caption-foot {
-  margin-top: 0.6rem;
+  margin-top: 0.5rem;
   font-size: 0.86rem;
   color: var(--text-faint);
 }

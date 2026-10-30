@@ -17,7 +17,7 @@ import {
   webLink,
   whereFromHome,
 } from "./format";
-import { comingNext, inView } from "./pick";
+import { comingNext, inView, rotating } from "./pick";
 import type { Plane } from "./types";
 
 function plane(over: Partial<Plane> = {}): Plane {
@@ -156,5 +156,15 @@ describe("pick", () => {
 
   it("lists what is coming, soonest first, without what is already in view", () => {
     expect(comingNext([later, low, soon, away]).map((p) => p.hex)).toEqual(["c", "d"]);
+  });
+});
+
+describe("rotating", () => {
+  it("takes turns on the clock", () => {
+    expect(rotating(["a", "b", "c"], new Date(0), 20_000)).toBe("a");
+    expect(rotating(["a", "b", "c"], new Date(45_000), 20_000)).toBe("c");
+    expect(rotating(["a", "b", "c"], new Date(60_000), 20_000)).toBe("a");
+    expect(rotating([], new Date(0), 20_000)).toBeUndefined();
+    expect(rotating(["a"], null, 20_000)).toBeUndefined();
   });
 });
