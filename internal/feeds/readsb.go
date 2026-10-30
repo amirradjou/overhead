@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -140,7 +141,7 @@ func (b readsbResponse) positions(feed string, center geo.Point, radiusKm float6
 		}
 		p := Position{
 			Hex:          hex,
-			Callsign:     Printable(a.Flight),
+			Callsign:     callsign(a.Flight),
 			Registration: Printable(a.R),
 			TypeCode:     Printable(a.T),
 			Category:     Printable(a.Category),
@@ -176,6 +177,19 @@ func (b readsbResponse) positions(feed string, center geo.Point, radiusKm float6
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// validCallsign is the ADS-B identification alphabet: up to eight letters and digits (spaces pad it).
+var validCallsign = regexp.MustCompile(`^[A-Z0-9]{1,8}$`)
+
+// callsign cleans a broadcast identification. readsb prints "@" for characters it could not decode, and a callsign
+// with any of them is no callsign: looked up, it only earns an error.
+func callsign(flight string) string {
+	c := strings.TrimSpace(flight)
+	if !validCallsign.MatchString(c) {
+		return ""
+	}
+	return c
 }
 
 // surface reports whether an ADS-B emitter category is a ground vehicle or obstacle (C1 to C7) rather than an

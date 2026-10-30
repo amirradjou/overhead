@@ -186,6 +186,14 @@ func TestFeedTextCannotDriveTheTerminal(t *testing.T) {
 	}
 }
 
+func TestCallsign(t *testing.T) {
+	for in, want := range map[string]string{"ACA101  ": "ACA101", "@@@@@@@@": "", "ACA1@@  ": "", "": "", "  ": "", "c-gabc": "", "N123AB": "N123AB"} {
+		if got := callsign(in); got != want {
+			t.Errorf("callsign(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestSurface(t *testing.T) {
 	for cat, want := range map[string]bool{"C1": true, "C2": true, "C7": true, "C0": false, "A3": false, "B6": false, "": false} {
 		if got := surface(cat); got != want {
