@@ -23,6 +23,7 @@ commands:
   live      keep the live picture and serve it to the screen: /api/now, /api/events (SSE)
   history   write the positions to one-minute batch files
   verify    check the batch files for lost or duplicated events
+  headsup   message the phone when something worth seeing is about to pass the window (or -replay a day)
   version   print the version
 
 Run "overhead <command> -h" for a command's flags.
@@ -33,7 +34,9 @@ environment:
   OVERHEAD_DATA                where enrich and history keep their files (default ./data)
   OVERHEAD_TZ                  the time zone of "today", e.g. America/Toronto (default: the system's)
   OVERHEAD_WINDOW_AZ, _FOV, _MIN_EL, OVERHEAD_HOME_ELEV
-                               the window the screen draws (live; default: all round, down to 5°)
+                               the window the screen draws (live, headsup; default: all round, down to 5°)
+  OVERHEAD_TELEGRAM_TOKEN, OVERHEAD_TELEGRAM_CHAT
+                               where heads-ups go (headsup; without them they are only logged)
 `
 
 func main() {
@@ -75,6 +78,8 @@ func main() {
 		err = runHistory(ctx, os.Args[2:])
 	case "verify":
 		err = runVerify(ctx, os.Args[2:])
+	case "headsup":
+		err = runHeadsup(ctx, os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

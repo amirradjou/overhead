@@ -133,7 +133,20 @@ It uses the same OVERHEAD_LAT/LON and window settings, plus OVERHEAD_TZ (default
 hours. A fact appears only once the history can back it: "first time today" after two days of history, the
 month's rarest type and regulars after three.
 
-Without window settings the screen shows the whole sky round home, down to 5 degrees. `pnpm dev` in `web/` serves the
+Without window settings the screen shows the whole sky round home, down to 5 degrees.
+
+Heads-ups (M5) watch the alerts queue with the same window settings; with a Telegram bot they reach the phone,
+without one they are only logged. A stored day can be replayed to see what would have been sent:
+
+```sh
+export OVERHEAD_TELEGRAM_TOKEN=123:abc OVERHEAD_TELEGRAM_CHAT=42   # from @BotFather; optional
+./bin/overhead headsup
+./bin/overhead headsup -replay data/history -day 2026-10-30
+```
+
+The rules: an emergency squawk anywhere in the circle; a rare airframe, a low pass nearly straight over the window
+or a type never seen here (after a first week of learning) when it is due in view within three minutes. Each
+aircraft gets each heads-up once a day, kept in `data/headsup.db` so a restart does not repeat them. `pnpm dev` in `web/` serves the
 screen with hot reload; add `?api=http://localhost:8090` to the address to point it at a running live API.
 
 History to S3 and Snowflake (M3): the writer puts the same batches in a bucket, and Snowpipe loads them.

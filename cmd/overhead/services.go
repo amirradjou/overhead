@@ -147,22 +147,9 @@ func runLive(ctx context.Context, args []string) error {
 	web := fs.String("web", "", "serve the screen's static files from this directory (web/out)")
 	factsPath := fs.String("facts", dataPath("facts.json"), "facts for the screen, as overhead-stats writes them")
 	public := fs.Bool("public", false, "commercial flights only (the README privacy rule for the public demo)")
-	w := live.DefaultWindow
-	for _, f := range []struct {
-		dst       *float64
-		flag, env string
-		usage     string
-	}{
-		{&w.AzimuthDeg, "window-az", "OVERHEAD_WINDOW_AZ", "the direction the window faces, degrees from north (180: south)"},
-		{&w.FOVDeg, "window-fov", "OVERHEAD_WINDOW_FOV", "how wide a slice of sky the window shows, in degrees (360: all round)"},
-		{&w.MinElevationDeg, "window-min-el", "OVERHEAD_WINDOW_MIN_EL", "the lowest angle above the horizon visible over what stands opposite"},
-		{&w.HomeElevationM, "home-elev", "OVERHEAD_HOME_ELEV", "the window's height above sea level, in metres"},
-	} {
-		v, err := envFloat(f.env, *f.dst)
-		if err != nil {
-			return usageError{err.Error()}
-		}
-		fs.Float64Var(f.dst, f.flag, v, f.usage+" ("+f.env+")")
+	w, err := addWindowFlags(fs)
+	if err != nil {
+		return err
 	}
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "usage: overhead live [-addr :8090] [-web web/out] [-public]   (OVERHEAD_AMQP)")
@@ -177,14 +164,14 @@ func runLive(ctx context.Context, args []string) error {
 	if err := c.check("live"); err != nil {
 		return err
 	}
-	if w.FOVDeg <= 0 || w.FOVDeg > 360 || w.MinElevationDeg < -5 || w.MinElevationDeg >= 90 {
-		return usageError{"overhead live: -window-fov must be 1 to 360 and -window-min-el below 90"}
+	if err := checkWindow("live", *w); err != nil {
+		return err
 	}
 	// Everything below stops with ctx; a listener that fails cancels it, so the command exits with its error rather
 	// than draining the queues with no one to serve.
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
-	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: w}
+	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: *w}
 	srv := &live.Server{State: state}
 	if *web != "" {
 		srv.Web = http.FileServer(http.Dir(*web))
