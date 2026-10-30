@@ -39,3 +39,7 @@ bin/
 
 # local runtime data (enrichment cache, history batches)
 data/
+
+# Local tools: the editor's settings and the browser-automation tool's screenshots and logs.
+.vscode/
+.playwright-mcp/
