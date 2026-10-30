@@ -37,6 +37,8 @@ naming the project, backs off after errors and honours Retry-After.
 | airplanes.live | live positions in a radius | free for non-commercial use, about one request a second; now answers 403 until the project is approved by email, so it is off by default |
 | adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data may not be copied into other databases, so routes stay in the day-long cache and never reach the history |
 | planespotters.net | a photo of that exact airframe | photographer credit on every photo, linked to its photo page where a pointer exists; hotlinked, never proxied or stored; terms to read in a browser (the page refuses scripted fetches) |
+| Open-Meteo | the weather at home: cloud cover by layer, wind, visibility | free for non-commercial use, no key, credited and linked; asked once every 10 minutes by the live API whatever the number of screens; `OVERHEAD_WEATHER=off` stops it |
+| OpenStreetMap | Toronto harbour's shores, islands, runways, piers and buildings, for the view from a high window | © OpenStreetMap contributors (ODbL), credited and linked on screen; extracted once into `web/lib/scenery/` by `web/scripts/scenery/fetch.sh` |
 
 Coverage is what the volunteer receivers see — excellent around Toronto Pearson, thinner for very low flights.
 
@@ -70,7 +72,13 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
    motion, dimmer at night, a slight drift of the whole scene so nothing burns into a TV, and days of running without
    a reload in a TV browser as old as Chromium 79. Readable from the sofa: no text under 23 px at 1080p, every label
    at least 4.5:1 against the sky behind it, all text inside a 5% safe area. From high up, where the window looks
-   down past the horizon, the bottom of the view is water or land below the horizon rather than rooftops.
+   down past the horizon, the bottom of the view is water or land below the horizon rather than rooftops; high over
+   Toronto's harbour it is the harbour itself, drawn from OpenStreetMap with the planes' own geometry (the lake out
+   to its horizon, the islands and their trees, Billy Bishop's runways, the piers, the harbour front's buildings
+   with their floors, the tall ship at its quay), so a landing plane touches the drawn runway; at night the runway's
+   edge lights, the shore's lamps and lit windows. The clouds are the weather's: cumulus, altocumulus and cirrus in
+   perspective, or an overcast deck, coloured by the sun and drifting with the wind; rain and snow show too. Between
+   planes the screen says the weather and the wind, and the runway it puts in use.
    It can follow one airport (`OVERHEAD_AIRPORT`, Billy Bishop for now): then it shows only that airport's landings
    and take-offs and planes very close to the window (`OVERHEAD_NEAR_KM`), each told in full (on final for runway
    26 and when it touches down, or how long ago it took off; its height against the window's; where to look; the

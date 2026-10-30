@@ -109,6 +109,8 @@ export const sourceHomes: Record<string, string> = {
   "airplanes.live": "https://airplanes.live",
   adsbdb: "https://www.adsbdb.com",
   "planespotters.net": "https://www.planespotters.net",
+  "open-meteo.com": "https://open-meteo.com",
+  OpenStreetMap: "https://www.openstreetmap.org/copyright",
 };
 
 /** A link from the feeds, if it is a web address: anything else (javascript:, data:) is dropped, not followed. */
