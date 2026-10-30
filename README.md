@@ -159,6 +159,17 @@ OVERHEAD_S3_ENDPOINT=http://localhost:9010 AWS_ACCESS_KEY_ID=overhead AWS_SECRET
   AWS_REGION=us-east-1 ./bin/overhead history -s3 s3://overhead/history
 ```
 
+AWS and Snowflake in one command (M6), for tests: AWS is not where the live screen runs (that is one small server),
+so it goes up for a check and down after.
+
+```sh
+make up      # Terraform: bucket, ECR, a Fargate task (RabbitMQ + poll + history to S3), Snowflake pipe; pushes the image
+make down    # removes all of it, the bucket's data included
+```
+
+`TF_VAR_snowflake=false make up` leaves Snowflake out. Snowflake's credentials come from the usual `SNOWFLAKE_*`
+variables; the warehouse is X-Small and suspends after a minute idle.
+
 Every position event carries the poller's run id and a sequence number, so `verify` can prove nothing was lost or
 stored twice. The history writer acknowledges a batch only after writing it, and a batch's file name comes from its
 first sequence number, so a redelivered batch overwrites its own file. Changing a queue's arguments in

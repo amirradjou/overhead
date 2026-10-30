@@ -76,3 +76,28 @@ jobs:
         run: uv run ruff format --check . && uv run ruff check .
       - name: Test
         run: uv run pytest -q
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the image (not pushed)
+        run: docker build --build-arg VERSION=${{ github.sha }} -t overhead:ci .
+      - name: It runs
+        run: docker run --rm overhead:ci version
