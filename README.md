@@ -4,8 +4,10 @@ The planes you can see from your window, live: a calm, screensaver-like view of 
 screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
 community flight-tracking feeds.
 
-> **Status: M0–M6 built (PRs #2–#9, 2026-10-30). M0 and M1 meet their "Done when"; M2–M7 do not yet, and the
-> milestone table says what each still needs.** This README is the spec.
+> **Status (2026-10-30): M0–M6 built and merged (PRs #2–#13); the whole stack runs from one `docker compose up -d`.
+> M0 and M1 meet their "Done when". M2–M7 wait on things only the owner can provide (the window's measurements, a TV
+> device, a Telegram bot, AWS and Snowflake accounts, a server): [docs/setup.md](docs/setup.md) says how to provide
+> each, and [Milestones](#milestones) what each still needs.** This README is the spec.
 
 ## What it is
 
@@ -78,13 +80,15 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
 9. **Window setup** — the window is its direction (a phone compass set to true north, or the wall's bearing on a map;
    magnetic north is about 10° off in Toronto), its left and right edges and its top as seen from where you sit, the
    lowest angle visible over the roofs opposite (a phone level sighted along the roofline), and the home's height
-   above sea level (OVERHEAD_HOME_ELEV). A setup view draws every plane round home on a full-sky strip with the window
-   over it, so the numbers can be nudged until a plane you see enters where the screen says.
+   above sea level (OVERHEAD_HOME_ELEV); [docs/setup.md](docs/setup.md#1-home-and-window) says how to measure each.
+   Still to come: a setup view that draws every plane round home on a full-sky strip with the window over it, so the
+   numbers can be nudged until a plane you see enters where the screen says.
 10. **Where it runs** — at home, one always-on small machine runs the whole stack with one `docker compose up -d`
     (RabbitMQ, poll, enrich, history, live, headsup and the facts job), restarting on boot. The TV shows it full
     screen, best from a Raspberry Pi or HDMI stick in Chromium kiosk mode; the TV's own browser is best effort, and its
-    auto power-off timer must be off. The live API stays on the home network (it serves home's coordinates). The
-    public demo is the same stack in `-public` mode on the shared Hetzner box, centred on a public spot by the airport.
+    auto power-off timer must be off. The machine must never sleep: a desktop's automatic suspend leaves a gap in the
+    history. The live API stays on the home network (it serves home's coordinates). The public demo is the same stack
+    in `-public` mode on the shared Hetzner box, centred on a public spot by the airport.
 
 ## Event flow (RabbitMQ)
 
@@ -119,8 +123,8 @@ OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38 ./bin/overhead watch -radius 20
 ./bin/overhead watch -for 1h > run.log   # M0's check: one line per poll, then pass/fail on gaps and duplicates
 ```
 
-The whole stack on an always-on machine (README item 10): put your home and window in `.env` (see `.env.example`),
-then
+The whole stack on an always-on machine (README item 10): put your home and window in `.env` (see `.env.example`, and
+[docs/setup.md](docs/setup.md) for how to measure the window and set up the TV), then
 
 ```sh
 docker compose up -d                 # RabbitMQ, poll, enrich, history, live, headsup and the facts job
@@ -232,6 +236,32 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 | M5 🔶 built | Heads-up on the phone (Telegram) | replaying seven stored days sends exactly the heads-ups on a list made by hand from the passes (each emergency squawk, low pass over the window, rare or first-seen type), none twice; one live heads-up reaches the phone at least two minutes before its plane enters the window |
 | M6 🔶 built | Terraform for AWS + Snowflake | from a clean account, `make up` brings everything up and the Fargate task's batches reach Snowflake; `make down` leaves nothing (`terraform state list` empty, bucket gone); the test costs under US$5 |
 | M7 | Public demo | seven days on the shared Hetzner box without a restart: centred on a public spot by the airport, `-public` on, every plane shown has an airline callsign, home's coordinates appear in no response, the credits link to each source and each photo to its planespotters page, and the feeds see the same request rate with 1 viewer or 50 |
+
+What the open milestones wait for (sections of [docs/setup.md](docs/setup.md)):
+
+- **M2**: the window measured (1), the TV device on a machine that never sleeps (2), and one or two clear evenings
+  for the sighting log (3).
+- **M3, M4, M6**: seven consecutive days of history (the home stack has been collecting since 2026-10-30 12:48 UTC,
+  so 2026-11-06 at the earliest), then the AWS account and the Snowflake trial for one session (5).
+- **M5**: a Telegram bot (4); the hand-made list for the replay comes from the stored passes.
+- **M7**: the server (6) and the checks before anything is public (7).
+
+## Code layout
+
+| Path | What is there |
+|---|---|
+| `cmd/overhead/` | the CLI: `watch`, `poll`, `enrich`, `live`, `history`, `verify`, `headsup` |
+| `internal/feeds`, `internal/poller` | readsb feed clients, the merge by ICAO address, polling with per-feed backoff and gap stats |
+| `internal/events`, `internal/bus`, `internal/relay` | wire formats, the RabbitMQ topology and confirmed publisher, snapshots to position events |
+| `internal/enrich` | adsbdb and planespotters lookups, the bbolt cache, retry and dead-letter handling |
+| `internal/live` | the current picture, the window (sight, in view, coming next), prediction scoring, the SSE server |
+| `internal/history` | one-minute batches to disk or S3, `verify` |
+| `internal/headsup` | heads-up rules, the ledger, Telegram, replay |
+| `internal/geo` | distance, bearing, elevation above the horizon |
+| `web/` | the screen: Next.js static export, served by `overhead live -web` |
+| `analysis/` | passes (`passes.sql`) and facts with DuckDB, as the `overhead-stats` job |
+| `snowflake/`, `terraform/` | M3's SQL and M6's infrastructure |
+| `docs/setup.md` | what the owner provides: the window, the TV, the bot, the accounts, the server |
 
 ## M0 results
 
