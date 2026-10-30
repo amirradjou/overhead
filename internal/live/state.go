@@ -3,6 +3,7 @@
 package live
 
 import (
+	"math"
 	"regexp"
 	"slices"
 	"sync"
@@ -49,6 +50,7 @@ type State struct {
 	pruned   time.Time
 
 	weather              *Weather
+	metar                *Metar
 	runway               string // the runway the latest take-off or landing at Airport used
 	runwayAt             time.Time
 	arrivals, departures map[string]struct{} // flights that landed at or took off from Airport today
@@ -80,7 +82,8 @@ func (s *State) Update(e events.Position) {
 	defer s.mu.Unlock()
 	s.init()
 	s.received++
-	if cur, ok := s.pos[e.Hex]; ok && !e.At.After(cur.At) {
+	cur, had := s.pos[e.Hex]
+	if had && !e.At.After(cur.At) {
 		return
 	}
 	s.pos[e.Hex] = e.Position
@@ -92,6 +95,9 @@ func (s *State) Update(e events.Position) {
 	}
 	if day == s.day {
 		s.today[e.Hex] = struct{}{}
+		if had {
+			s.countMovement(cur, e.Position)
+		}
 	}
 	s.track(e.Position)
 }
@@ -160,6 +166,9 @@ type Plane struct {
 	Airport *AtAirport `json:"airport,omitempty"`
 	Near    bool       `json:"near,omitempty"`
 	Focus   bool       `json:"focus,omitempty"`
+	// AltMSLFt is the true altitude, the pressure altitude corrected for today's pressure, below 18,000 ft when the
+	// pressure is known; alt_ft stays as the aircraft reported it.
+	AltMSLFt *int `json:"alt_msl_ft,omitempty"`
 }
 
 // SpecialTypes are airframes rare almost anywhere, by ICAO type designator. Rarity at home (what is unusual over this
@@ -248,6 +257,8 @@ func (s *State) View(now time.Time) View {
 		Focused: s.Airport != nil || s.NearKm > 0, NearKm: s.NearKm,
 	}
 	today := now.Local().Format(time.DateOnly) == s.day
+	v.Weather = s.weatherNow(now)
+	lift := pressureFeet(v.Weather)
 	sources := make(map[string]bool)
 	for hex, p := range s.pos {
 		if now.Sub(p.At) > maxAge {
@@ -263,12 +274,18 @@ func (s *State) View(now time.Time) View {
 			BearingDeg: geo.BearingDeg(s.Center, p.Point()),
 			Notable:    notable(p),
 		}
+		// Heights are true heights: the pressure altitude corrected for today's pressure, below the transition.
+		g := p
+		if lift != 0 && p.AltFt != nil && *p.AltFt < transitionFt {
+			a := *p.AltFt + int(math.Round(lift))
+			g.AltFt, pl.AltMSLFt = &a, &a
+		}
 		var route *events.Route
 		if info, ok := s.info[hex]; ok {
 			if info.Route != nil && info.Route.Callsign != p.Callsign {
 				info.Route = nil // a route looked up for an earlier flight of this airframe
 			}
-			if info.Route != nil && !plausible(p, info.Route) {
+			if info.Route != nil && !plausible(g, info.Route) {
 				info.Route = nil // an old leg of a reused flight number
 			}
 			pl.Info = &info
@@ -276,21 +293,21 @@ func (s *State) View(now time.Time) View {
 			route = info.Route
 		}
 		if s.Airport != nil {
-			if at := s.Airport.classify(p, route); at != nil {
+			if at := s.Airport.classify(g, route); at != nil {
 				pl.Airport = at
-				s.noteAirport(p, at, now, today)
+				s.noteAirport(p, at)
 			}
 		}
-		pl.Near = near(p, s.Center, w.HomeElevationM, s.NearKm)
+		pl.Near = near(g, s.Center, w.HomeElevationM, s.NearKm)
 		pl.Focus = pl.Near || (pl.Airport != nil && pl.Airport.Phase != "gate" && pl.Airport.Phase != "arrived")
 		// Placed where it should be now, not where it was last reported: the report may be several seconds old.
 		age := reportAge(p, now)
-		if pt, h, ok := project(p, age); ok {
+		if pt, h, ok := project(g, age); ok {
 			sg := w.sight(s.Center, pt, h)
 			pl.ElevationDeg, pl.OffsetDeg, pl.InView = sg.elevation, sg.offset, w.sees(sg)
-			pl.Motion = w.motion(s.Center, p, age, sg)
+			pl.Motion = w.motion(s.Center, g, age, sg)
 			if !pl.InView {
-				pl.Coming = w.coming(s.Center, p, now)
+				pl.Coming = w.coming(s.Center, g, now)
 			}
 		} else {
 			pl.OffsetDeg = geo.AngleDiff(pl.BearingDeg, w.AzimuthDeg)
@@ -314,10 +331,7 @@ func (s *State) View(now time.Time) View {
 	if today {
 		v.Today = len(s.today)
 	}
-	if s.weather != nil && now.Sub(s.weather.At) <= weatherStale {
-		w := *s.weather
-		v.Weather = &w
-	}
+
 	if a := s.Airport; a != nil {
 		v.Airport = &AirportView{ICAO: a.ICAO, IATA: a.IATA, Name: a.Name, Lat: a.Lat, Lon: a.Lon, ElevationFt: a.ElevationFt}
 		if s.runway != "" && now.Sub(s.runwayAt) <= runwayFresh {
@@ -332,18 +346,26 @@ func (s *State) View(now time.Time) View {
 }
 
 // noteAirport keeps the runway in use and the day's arrivals and departures. Caller holds s.mu.
-func (s *State) noteAirport(p feeds.Position, at *AtAirport, now time.Time, today bool) {
+func (s *State) noteAirport(p feeds.Position, at *AtAirport) {
 	if at.Runway != "" && !p.At.Before(s.runwayAt) {
 		s.runway, s.runwayAt = at.Runway, p.At
 	}
-	if !today {
+}
+
+// countMovement counts a touchdown or a lift-off at the followed airport: a flight whose reports change between
+// airborne and on the ground close to it. Each flight is counted once a day each way. Caller holds s.mu.
+func (s *State) countMovement(prev, p feeds.Position) {
+	if s.Airport == nil || prev.OnGround == p.OnGround {
+		return
+	}
+	ap := s.Airport.point()
+	if geo.DistanceKm(ap, p.Point()) > groundKm || geo.DistanceKm(ap, prev.Point()) > 2*groundKm {
 		return
 	}
 	key := p.Hex + "/" + p.Callsign
-	switch arr, dep := counted(at); {
-	case arr:
+	if p.OnGround {
 		s.arrivals[key] = struct{}{}
-	case dep:
+	} else {
 		s.departures[key] = struct{}{}
 	}
 }
@@ -385,6 +407,20 @@ const (
 	routeSlackKm = 150.0 // and this much more, for short hops and planes still near either end
 )
 
+// The corridor is not enough: a route must also fit what the plane is doing. Checked against independent sources on
+// 2026-10-30, 6 of 43 routes passed the corridor and were still wrong (KLM147 "Pearson to Amsterdam" landing at
+// Pearson, JZA482 "departing Pearson" cruising over it, AAL1876 parked at Pearson as "Dallas to Washington"). So: on
+// the ground it must be at one end; low it must be near an end, descending towards its destination or climbing
+// away from its origin; and it cannot be cruising close to either end.
+const (
+	routeGroundKm  = 5.0
+	routeLowFt     = 10000
+	routeLowKm     = 100.0
+	routeCruiseFt  = 25000
+	routeCruiseKm  = 60.0
+	routeVerticalF = 500 // ft/min: climbing or descending, not wobbling level
+)
+
 func plausible(p feeds.Position, r *events.Route) bool {
 	o := geo.Point{Lat: r.Origin.Lat, Lon: r.Origin.Lon}
 	d := geo.Point{Lat: r.Destination.Lat, Lon: r.Destination.Lon}
@@ -392,8 +428,40 @@ func plausible(p feeds.Position, r *events.Route) bool {
 		return true // nothing to check it against
 	}
 	here := p.Point()
-	return geo.DistanceKm(o, here)+geo.DistanceKm(here, d) <= routeSlack*geo.DistanceKm(o, d)+routeSlackKm
+	toO, toD := geo.DistanceKm(o, here), geo.DistanceKm(here, d)
+	if toO+toD > routeSlack*geo.DistanceKm(o, d)+routeSlackKm {
+		return false
+	}
+	near := math.Min(toO, toD)
+	if p.OnGround {
+		return near <= routeGroundKm
+	}
+	if p.AltFt == nil {
+		return true
+	}
+	switch alt := *p.AltFt; {
+	case alt > routeCruiseFt:
+		return near >= routeCruiseKm
+	case alt < routeLowFt:
+		if near > routeLowKm {
+			return false
+		}
+		if vr := p.VertRateFpm; vr != nil {
+			if *vr <= -routeVerticalF && toO < toD {
+				return false // coming down at its origin
+			}
+			if *vr >= routeVerticalF && toD < toO {
+				return false // climbing out of its destination
+			}
+		}
+	}
+	return true
 }
+
+// etaClosingDeg: a time to landing is given only to a plane heading for its destination within this many degrees.
+// One being vectored or flying a downwind leg lands far later than distance over speed says (ten minutes later, in
+// the check of 2026-10-30).
+const etaClosingDeg = 30.0
 
 func eta(p feeds.Position, r *events.Route) (*float64, *float64) {
 	if r == nil || (r.Destination.Lat == 0 && r.Destination.Lon == 0) {
@@ -404,6 +472,10 @@ func eta(p feeds.Position, r *events.Route) (*float64, *float64) {
 		return nil, nil
 	}
 	if p.OnGround || p.SpeedKt == nil || *p.SpeedKt < 60 {
+		return &km, nil
+	}
+	dest := geo.Point{Lat: r.Destination.Lat, Lon: r.Destination.Lon}
+	if p.TrackDeg != nil && km > 3 && math.Abs(geo.AngleDiff(geo.BearingDeg(p.Point(), dest), *p.TrackDeg)) > etaClosingDeg {
 		return &km, nil
 	}
 	minutes := km / (*p.SpeedKt * geo.KmPerNM) * 60

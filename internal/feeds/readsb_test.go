@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"maps"
 	"net/http"
@@ -199,6 +200,26 @@ func TestSurface(t *testing.T) {
 	for cat, want := range map[string]bool{"C1": true, "C2": true, "C7": true, "C0": false, "A3": false, "B6": false, "": false} {
 		if got := surface(cat); got != want {
 			t.Errorf("surface(%q) = %v, want %v", cat, got, want)
+		}
+	}
+}
+
+func TestVehicle(t *testing.T) {
+	ground := json.RawMessage(`"ground"`)
+	for _, c := range []struct {
+		name string
+		a    readsbAircraft
+		want bool
+	}{
+		{"listed as SERV", readsbAircraft{T: "SERV", AltBaro: ground}, true},
+		{"registered SERV", readsbAircraft{R: "serv"}, true},
+		{"no category, non-transponder, on the ground", readsbAircraft{Type: "adsb_icao_nt", AltBaro: ground}, true},
+		{"non-transponder but airborne", readsbAircraft{Type: "adsb_icao_nt", AltBaro: json.RawMessage(`1200`)}, false},
+		{"an airliner on the ground", readsbAircraft{Type: "adsb_icao", Category: "A3", AltBaro: ground}, false},
+		{"a TIS-B light aircraft", readsbAircraft{Type: "tisb_icao", AltBaro: json.RawMessage(`1500`)}, false},
+	} {
+		if got := vehicle(c.a); got != c.want {
+			t.Errorf("%s: vehicle = %v, want %v", c.name, got, c.want)
 		}
 	}
 }

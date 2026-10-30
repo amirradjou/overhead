@@ -1,6 +1,7 @@
 // Words and numbers for the screen. Plain language for a living room: km/h rather than knots, "south-west" rather
 // than 225°; altitude stays in feet, the unit pilots and every flight app use.
 import { looksDown } from "./sky";
+import { typeFacts } from "./aircraft";
 import type { Airport, Plane, Window } from "./types";
 
 const thousands = new Intl.NumberFormat("en-CA");
@@ -8,8 +9,14 @@ const thousands = new Intl.NumberFormat("en-CA");
 /** "9,700 ft", "On the ground", or "" when unknown. */
 export function altitude(p: Plane): string {
   if (p.on_ground) return "On the ground";
-  if (p.alt_ft === undefined) return "";
-  return `${thousands.format(Math.round(p.alt_ft / 25) * 25)} ft`;
+  const ft = altFt(p);
+  if (ft === undefined) return "";
+  return `${thousands.format(Math.round(ft / 25) * 25)} ft`;
+}
+
+/** The plane's true altitude in feet: corrected for today's pressure where the server could, else as reported. */
+export function altFt(p: Plane): number | undefined {
+  return p.alt_msl_ft ?? p.alt_ft;
 }
 
 /** Climbing, descending or level, from the vertical rate; level within ±300 ft/min. */
@@ -81,8 +88,15 @@ export function operator(p: Plane): string {
   return p.info?.route?.airline || p.info?.owner || "";
 }
 
-/** "Embraer ERJ 190-400", falling back to the type code. */
+/**
+ * "Embraer ERJ 190-400", falling back to the type code. When the airframe database and the feed disagree on the
+ * type, the feed's is used: on 2026-10-30 adsbdb had an Air Canada A220-300 (BCS3 in both feeds, and in its photo's
+ * caption) as an A220-100, and a WestJet 737 MAX 8 as a 737-600.
+ */
 export function aircraftType(p: Plane): string {
+  if (p.type_code && p.info?.type_code && p.type_code !== p.info.type_code) {
+    return typeFacts[p.type_code]?.name ?? p.type_code;
+  }
   const name = p.info?.type_name;
   if (!name) return p.type_code ?? "";
   const maker = p.info?.manufacturer?.replace(

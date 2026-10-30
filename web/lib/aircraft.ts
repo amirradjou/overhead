@@ -1,11 +1,14 @@
 // A few facts about the airliner types that pass over Toronto most, by ICAO type designator, for one calm line while
 // a plane is in view. Only facts that do not change from one airframe to the next (first flight, length, wingspan as
-// built) and seat counts as airlines usually fit them; written for this screen, not copied from anywhere.
+// built) and seat counts as airlines usually fit them; written for this screen, not copied from anywhere, and checked
+// against manufacturers' and published references on 2026-10-30.
 import type { Plane } from "./types";
 
 interface TypeFacts {
   /** What people call it: "737 MAX 8". */
   name: string;
+  /** The name of the first of its family to fly, when that was not this variant: "CRJ". */
+  flewAs?: string;
   firstFlight: number;
   lengthM: number;
   /** Left out where winglets fitted later make it differ between airframes. */
@@ -19,11 +22,11 @@ const crj = "A Canadian design: Bombardier built the CRJ near Montreal.";
 const cseries = "Designed in Canada, as the Bombardier CSeries.";
 
 export const typeFacts: Record<string, TypeFacts> = {
-  A319: { name: "A319", firstFlight: 1995, lengthM: 33.8, seats: [120, 150] },
+  A319: { name: "A319", firstFlight: 1995, lengthM: 33.8, seats: [120, 156] },
   A320: { name: "A320", firstFlight: 1987, lengthM: 37.6, seats: [150, 180] },
-  A321: { name: "A321", firstFlight: 1993, lengthM: 44.5, seats: [180, 220] },
+  A321: { name: "A321", firstFlight: 1993, lengthM: 44.5, seats: [180, 230] },
   A20N: { name: "A320neo", firstFlight: 2014, lengthM: 37.6, wingspanM: 35.8, seats: [150, 190] },
-  A21N: { name: "A321neo", firstFlight: 2016, lengthM: 44.5, wingspanM: 35.8, seats: [180, 220] },
+  A21N: { name: "A321neo", firstFlight: 2016, lengthM: 44.5, wingspanM: 35.8, seats: [180, 244] },
   A332: { name: "A330-200", firstFlight: 1997, lengthM: 58.8, wingspanM: 60.3 },
   A333: { name: "A330-300", firstFlight: 1992, lengthM: 63.7, wingspanM: 60.3 },
   A339: { name: "A330-900", firstFlight: 2017, lengthM: 63.7, wingspanM: 64 },
@@ -67,7 +70,16 @@ export const typeFacts: Record<string, TypeFacts> = {
     seats: [120, 160],
     note: cseries,
   },
-  CRJ2: { name: "CRJ200", firstFlight: 1991, lengthM: 26.8, wingspanM: 21.2, seats: [50, 50], note: crj },
+  // The first CRJ to fly, in 1991, was the CRJ100; the CRJ200 is the same airframe with other engines.
+  CRJ2: {
+    name: "CRJ200",
+    flewAs: "CRJ",
+    firstFlight: 1991,
+    lengthM: 26.8,
+    wingspanM: 21.2,
+    seats: [50, 50],
+    note: crj,
+  },
   CRJ9: { name: "CRJ900", firstFlight: 2001, lengthM: 36.2, wingspanM: 24.9, seats: [76, 90], note: crj },
   DH8D: {
     name: "Dash 8-400",
@@ -75,7 +87,7 @@ export const typeFacts: Record<string, TypeFacts> = {
     lengthM: 32.8,
     wingspanM: 28.4,
     seats: [68, 90],
-    note: "Designed by de Havilland Canada and built at Downsview, in Toronto.",
+    note: "Designed by de Havilland Canada and built at Downsview, in Toronto, until 2022.",
   },
   E75L: { name: "E175", firstFlight: 2003, lengthM: 31.7, seats: [76, 88] },
   E75S: { name: "E175", firstFlight: 2003, lengthM: 31.7, seats: [76, 88] },
@@ -111,7 +123,7 @@ export function typeFactLines(p: Plane): string[] {
   const lines: string[] = [];
   if (t.wingspanM) lines.push(`Wingspan ${t.wingspanM.toFixed(1)} m, ${sizeLike(t.wingspanM)}.`);
   else lines.push(`${t.lengthM.toFixed(1)} m long, ${sizeLike(t.lengthM)}.`);
-  lines.push(`The ${t.name} first flew in ${t.firstFlight}.`);
+  lines.push(`The ${t.flewAs ?? t.name} first flew in ${t.firstFlight}.`);
   if (t.seats) {
     const [lo, hi] = t.seats;
     lines.push(lo === hi ? `It seats ${lo}.` : `Airlines fit it with ${lo} to ${hi} seats.`);

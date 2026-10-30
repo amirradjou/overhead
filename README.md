@@ -38,9 +38,22 @@ naming the project, backs off after errors and honours Retry-After.
 | adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data may not be copied into other databases, so routes stay in the day-long cache and never reach the history |
 | planespotters.net | a photo of that exact airframe | photographer credit on every photo, linked to its photo page where a pointer exists; hotlinked, never proxied or stored; terms to read in a browser (the page refuses scripted fetches) |
 | Open-Meteo | the weather at home: cloud cover by layer, wind, visibility | free for non-commercial use, no key, credited and linked; asked once every 10 minutes by the live API whatever the number of screens; `OVERHEAD_WEATHER=off` stops it |
+| aviationweather.gov | the followed airport's weather report (METAR): its cloud layers, gusts and pressure | free, no key; asked once every 10 minutes; preferred to the model where both speak, since on 2026-10-30 Open-Meteo drew a nearly clear sky under the broken deck both Toronto airports reported; `OVERHEAD_METAR` names another station |
 | OpenStreetMap | Toronto harbour's shores, islands, runways, piers and buildings, for the view from a high window | © OpenStreetMap contributors (ODbL), credited and linked on screen; extracted once into `web/lib/scenery/` by `web/scripts/scenery/fetch.sh` |
 
 Coverage is what the volunteer receivers see — excellent around Toronto Pearson, thinner for very low flights.
+
+The data was checked against independent sources on 2026-10-30 (OpenSky's state vectors and aircraft database,
+hexdb.io, OurAirports, the airports' METARs, published type specifications). Positions agree with OpenSky to a
+median of 46 m and 25 ft; Billy Bishop's position, elevation and runways match OurAirports; wind and temperature
+match the METARs; every type's first flight, length and wingspan is right. What was wrong is corrected: routes
+that do not fit what the plane is doing (6 of 43, often a reused flight number's old leg) are no longer shown; Air
+Canada Rouge and Air Canada Express are named as they fly; registrations read "C-GFJD", not "CA-GFJD"; the feeds'
+type is preferred where the airframe database disagrees; airport vehicles without an emitter category are dropped;
+heights are true altitudes (ADS-B's pressure altitude corrected for the day's pressure, which was 300 ft on the
+day); a time to landing is given only to a plane heading for its airport; a plane is "on final" only heading in
+along the runway; and the day's landings and take-offs are counted from touchdowns and lift-offs and rebuilt from
+the history when the live API restarts.
 
 ## What it needs to do
 

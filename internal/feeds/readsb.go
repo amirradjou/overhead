@@ -136,7 +136,7 @@ func (b readsbResponse) positions(feed string, center geo.Point, radiusKm float6
 	out := make([]Position, 0, len(b.AC))
 	for _, a := range b.AC {
 		hex := strings.ToLower(Printable(a.Hex))
-		if hex == "" || a.Lat == nil || a.Lon == nil || surface(a.Category) {
+		if hex == "" || a.Lat == nil || a.Lon == nil || surface(a.Category) || vehicle(a) {
 			continue
 		}
 		p := Position{
@@ -197,6 +197,15 @@ func callsign(flight string) string {
 // Pearson's centre at any time.
 func surface(category string) bool {
 	return len(category) == 2 && category[0] == 'C' && category[1] >= '1' && category[1] <= '7'
+}
+
+// vehicle catches the airport vehicles that send no emitter category: Pearson's are listed with type or registration
+// "SERV", and the rest are non-transponder ICAO addresses (adsb_icao_nt) on the ground with no category at all.
+func vehicle(a readsbAircraft) bool {
+	if strings.EqualFold(a.T, "SERV") || strings.EqualFold(a.R, "SERV") {
+		return true
+	}
+	return a.Type == "adsb_icao_nt" && a.Category == "" && bytes.Equal(bytes.TrimSpace(a.AltBaro), []byte(`"ground"`))
 }
 
 func altitude(baro json.RawMessage, geom *float64) (*int, bool) {

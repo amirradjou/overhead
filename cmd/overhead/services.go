@@ -17,6 +17,7 @@ import (
 
 	"github.com/amirradjou/overhead/internal/bus"
 	"github.com/amirradjou/overhead/internal/enrich"
+	"github.com/amirradjou/overhead/internal/events"
 	"github.com/amirradjou/overhead/internal/history"
 	"github.com/amirradjou/overhead/internal/live"
 	"github.com/amirradjou/overhead/internal/poller"
@@ -153,6 +154,10 @@ func runLive(ctx context.Context, args []string) error {
 		"follow this airport (ICAO: "+strings.Join(slices.Sorted(maps.Keys(live.Airports)), ", ")+"): its take-offs and landings only, with more about each (OVERHEAD_AIRPORT)")
 	weather := fs.Bool("weather", env("OVERHEAD_WEATHER", "on") != "off",
 		"fetch the weather at home from open-meteo.com every 10 min, for the clouds and the wind (OVERHEAD_WEATHER=off)")
+	metar := fs.String("metar", env("OVERHEAD_METAR", ""),
+		"an airport (ICAO) whose weather reports (aviationweather.gov) give the sky, gusts and pressure; default: the followed airport (OVERHEAD_METAR)")
+	histDir := fs.String("history", dataPath("history"),
+		"stored positions to replay today's from at start, so today's counts survive a restart")
 	nearKm, err := envFloat("OVERHEAD_NEAR_KM", 0)
 	if err != nil {
 		return usageError{err.Error()}
@@ -195,6 +200,15 @@ func runLive(ctx context.Context, args []string) error {
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: *w, Airport: followed, NearKm: nearKm}
+	// Today's counts (aircraft seen, landings and take-offs) are rebuilt from the history, not begun again at zero.
+	started := time.Now()
+	midnight := time.Date(started.Year(), started.Month(), started.Day(), 0, 0, 0, 0, time.Local)
+	replayed := 0
+	if err := history.Each(*histDir, midnight, started, func(e events.Position) { state.Update(e); replayed++ }); err != nil &&
+		!errors.Is(err, os.ErrNotExist) {
+		slog.Warn("replaying today's history", "dir", *histDir, "err", err)
+	}
+	slog.Info("today replayed from history", "positions", replayed, "took", time.Since(started).Round(time.Millisecond))
 	srv := &live.Server{State: state}
 	if *web != "" {
 		srv.Web = http.FileServer(http.Dir(*web))
@@ -210,6 +224,15 @@ func runLive(ctx context.Context, args []string) error {
 		wc := &live.WeatherClient{Base: "https://api.open-meteo.com", HTTP: &http.Client{Timeout: 20 * time.Second},
 			UserAgent: userAgent()}
 		wg.Go(func() { live.WatchWeather(ctx, wc, state, 10*time.Minute) })
+		station := strings.ToUpper(*metar)
+		if station == "" && followed != nil {
+			station = followed.ICAO
+		}
+		if station != "" {
+			mc := &live.MetarClient{Base: "https://aviationweather.gov", HTTP: &http.Client{Timeout: 20 * time.Second},
+				UserAgent: userAgent()}
+			wg.Go(func() { live.WatchMetar(ctx, mc, state, station, 10*time.Minute) })
+		}
 	}
 	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-live", bus.QueueLive, 500, consumer.Positions) })
 	wg.Go(func() {

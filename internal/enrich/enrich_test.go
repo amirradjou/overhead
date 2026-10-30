@@ -173,6 +173,7 @@ func newWorker(t *testing.T) (*Worker, *fakeAPIs, *time.Time) {
 			"ACA101": {Callsign: "ACA101"},
 			// As adsbdb answered on 2026-10-30.
 			"PTR2943": {Callsign: "PTR2943", FlightIATA: "2943", Airline: "Nova Scotia Department of Lands and Forests", AirlineICAO: "PTR"},
+			"ROU1813": {Callsign: "ROU1813", FlightIATA: "1813", Airline: "Transportes Aereos I.R. Crusoe", AirlineICAO: "ROU"},
 		},
 		photos: map[string]*events.Photo{"c08861": {Thumbnail: "t.jpg", Link: "l", Photographer: "p"}},
 		calls:  map[string]int{},
@@ -225,8 +226,12 @@ func TestWorkerCorrectsKnownWrongAirlines(t *testing.T) {
 			t.Fatalf("enrich %d: route = %+v", i, got.Route)
 		}
 	}
+	got, err := w.Enrich(ctx, events.EnrichJob{Hex: "c0bbbb", Callsign: "ROU1813"})
+	if err != nil || got.Route == nil || got.Route.Airline != "Air Canada Rouge" || got.Route.FlightIATA != "RV1813" {
+		t.Fatalf("ROU1813: %+v, %v", got.Route, err)
+	}
 	// Airlines adsbdb has right are left alone.
-	got, err := w.Enrich(ctx, events.EnrichJob{Hex: "c08861", Callsign: "POE672"})
+	got, err = w.Enrich(ctx, events.EnrichJob{Hex: "c08861", Callsign: "POE672"})
 	if err != nil || got.Route == nil || got.Route.Airline != "Porter Airlines" {
 		t.Fatalf("POE672: %+v, %v", got.Route, err)
 	}
@@ -339,5 +344,13 @@ func TestConsumerMessages(t *testing.T) {
 	msgs, _ = c.messages(d, job, events.Aircraft{}, &decodeError{errors.New("bad json")})
 	if msgs[1].Exchange != bus.ExchangeEnrichDead {
 		t.Fatalf("a failure that won't pass goes straight to the dead-letter queue: %+v", msgs[1])
+	}
+}
+
+func TestRegistrationAsPainted(t *testing.T) {
+	for in, want := range map[string]string{"CA-GFJD": "C-GFJD", "C-GFJD": "C-GFJD", "N123AB": "N123AB", "CA-GFJDX": "CA-GFJDX"} {
+		if got := registration(in); got != want {
+			t.Errorf("registration(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

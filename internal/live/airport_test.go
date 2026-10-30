@@ -3,6 +3,7 @@ package live
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/amirradjou/overhead/internal/events"
 	"github.com/amirradjou/overhead/internal/feeds"
@@ -60,6 +61,10 @@ func TestClassifyAtBillyBishop(t *testing.T) {
 		{"no route, parked", at(0.2, -1, 0, 0, 0), nil, "", "", ""},
 		{"on the ground at another airport", at(-26, -1, 15, 0, 0), arriving, "", "", ""},
 		{"helicopter lifting off: no runway", heli(at(1.5, 600, 60, 72, 900)), nil, "departing", "takeoff", ""},
+		// The circling Cessna of 2026-10-30: coming down but heading away, then climbing over the field.
+		{"no route, descending but heading away", at(3, 1500, 90, 80, -400), nil, "", "", ""},
+		{"no route, climbing high over the field", at(0.1, 1900, 90, 250, 800), nil, "", "", ""},
+		{"take-off roll on 06", at(-0.2, -1, 90, 50, 0), leaving, "departing", "takeoff", "06"},
 	} {
 		got := ytz.classify(c.p, c.route)
 		if c.op == "" {
@@ -123,8 +128,12 @@ func TestViewFollowsTheAirport(t *testing.T) {
 		p.Hex, p.At, p.Source = hex, t0, "adsb.fi"
 		return events.Position{Position: p}
 	}
+	// It counts as an arrival when it touches down: airborne over the threshold, then on the ground.
+	over := at(0.8, 300, 110, 252, -600)
+	s.Update(pos("aaaaaa", over))
 	landing := at(0.3, -1, 95, 252, 0)
-	s.Update(pos("aaaaaa", landing))
+	landing.At = t0.Add(5 * time.Second)
+	s.Update(events.Position{Position: func() feeds.Position { landing.Hex, landing.Source = "aaaaaa", "adsb.fi"; return landing }()})
 	s.SetAircraft(events.Aircraft{Hex: "aaaaaa", Route: arriving})
 	parked := at(0.1, -1, 0, 0, 0)
 	parked.Callsign = "PTR2635"
@@ -134,7 +143,7 @@ func TestViewFollowsTheAirport(t *testing.T) {
 	far.Callsign = "ACA400"
 	s.Update(pos("cccccc", far))
 
-	v := s.View(t0)
+	v := s.View(t0.Add(5 * time.Second))
 	if !v.Focused || v.Airport == nil || v.Airport.IATA != "YTZ" || v.Airport.RunwayInUse != "26" ||
 		v.Airport.ArrivalsToday != 1 || v.Airport.DeparturesToday != 0 {
 		t.Fatalf("view: focused %v, airport %+v", v.Focused, v.Airport)
@@ -145,5 +154,16 @@ func TestViewFollowsTheAirport(t *testing.T) {
 	}
 	if !focus["aaaaaa"] || focus["bbbbbb"] || focus["cccccc"] {
 		t.Fatalf("focus = %v: the landing plane only, not the one at the gate or the one passing far off", focus)
+	}
+}
+
+func TestRunwayNeedsTheCentreLine(t *testing.T) {
+	// Lined up with 26 and heading for the field, but 4 km north of the centre line: on final, on no runway.
+	pt := geo.Destination(geo.Destination(ytz.point(), 90, 3), 0, 4)
+	track, speed, alt, fpm := 251.0, 125.0, 1150, -700
+	p := feeds.Position{Hex: "c0ffee", Lat: pt.Lat, Lon: pt.Lon, TrackDeg: &track, SpeedKt: &speed, AltFt: &alt, VertRateFpm: &fpm}
+	got := ytz.classify(p, arriving)
+	if got == nil || got.Phase != "final" || got.Runway != "" {
+		t.Fatalf("parallel offset: %+v", got)
 	}
 }
