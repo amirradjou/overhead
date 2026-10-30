@@ -86,6 +86,36 @@ func TestViewJoinsEnrichmentAndETA(t *testing.T) {
 	}
 }
 
+func TestViewDropsImpossibleRoutes(t *testing.T) {
+	// Over Lake Ontario, as on 2026-10-30.
+	lake := geo.Point{Lat: 43.45, Lon: -79.30}
+	airport := func(lat, lon float64) events.Airport { return events.Airport{Lat: lat, Lon: lon} }
+	bos, lga, ewr, mco := airport(42.3643, -71.0052), airport(40.7769, -73.874), airport(40.6925, -74.1687), airport(28.4294, -81.309)
+	ytz, lhr, yyz := airport(43.6275, -79.3962), airport(51.47, -0.4543), airport(43.6772, -79.6306)
+	jfk, hnd := airport(40.6398, -73.7789), airport(35.5523, 139.78)
+	for _, c := range []struct {
+		name     string
+		from, to events.Airport
+		keep     bool
+	}{
+		{"UAL397 Newark to Orlando", ewr, mco, false},
+		{"RPA5603 Boston to LaGuardia", bos, lga, false},
+		{"PTR2943 Boston to Billy Bishop", bos, ytz, true},
+		{"ACA855 Heathrow to Pearson", lhr, yyz, true},
+		{"JAL5 JFK to Haneda, over Canada", jfk, hnd, true},
+		{"no origin: nothing to check", events.Airport{}, mco, true},
+	} {
+		s := &State{Center: pearson, RadiusKm: 60}
+		p := pos("aaaaaa", "XXX1", lake.Lat, t0)
+		p.Lon = lake.Lon
+		s.Update(p)
+		s.SetAircraft(events.Aircraft{Hex: "aaaaaa", Route: &events.Route{Callsign: "XXX1", Origin: c.from, Destination: c.to}})
+		if got := s.View(t0).Planes[0].Info.Route != nil; got != c.keep {
+			t.Errorf("%s: route shown = %v, want %v", c.name, got, c.keep)
+		}
+	}
+}
+
 func TestCoverage(t *testing.T) {
 	s := &State{Center: pearson, RadiusKm: 30}
 	// Long pass with type (from the feed) and route (from enrichment).
