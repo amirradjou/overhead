@@ -38,6 +38,7 @@ func (w Window) normalised() Window {
 	if w.FOVDeg <= 0 || w.FOVDeg > 360 {
 		w.FOVDeg = DefaultWindow.FOVDeg
 	}
+	w.AzimuthDeg = math.Mod(math.Mod(w.AzimuthDeg, 360)+360, 360)
 	return w
 }
 
@@ -82,23 +83,17 @@ func heightKm(p feeds.Position) (float64, bool) {
 // view within lookAhead, or nil. Straight lines only: a plane turning onto final approach will surprise it, which is
 // what M2's field check measures.
 func (w Window) coming(home geo.Point, p feeds.Position, now time.Time) *Coming {
-	h0, ok := heightKm(p)
-	if !ok || p.SpeedKt == nil || p.TrackDeg == nil || *p.SpeedKt < 30 {
+	if p.SpeedKt == nil || p.TrackDeg == nil || *p.SpeedKt < 30 {
 		return nil
 	}
-	kmPerSec := *p.SpeedKt * geo.KmPerNM / 3600
-	climbKmPerSec := 0.0
-	if p.VertRateFpm != nil {
-		climbKmPerSec = float64(*p.VertRateFpm) * 0.3048 / 60 / 1000
-	}
 	at := func(t float64) (sight, bool) {
-		h := h0 + climbKmPerSec*t
-		if h < 0 {
-			return sight{}, false // landed
+		pt, h, ok := project(p, t)
+		if !ok {
+			return sight{}, false
 		}
-		return w.sight(home, geo.Destination(p.Point(), *p.TrackDeg, kmPerSec*t), h), true
+		return w.sight(home, pt, h), true
 	}
-	age := max(0, now.Sub(p.At).Seconds())
+	age := reportAge(p, now)
 	prev, ok := at(age)
 	if !ok || w.sees(prev) {
 		return nil
@@ -116,6 +111,34 @@ func (w Window) coming(home geo.Point, p feeds.Position, now time.Time) *Coming 
 	return nil
 }
 
+// maxDeadReckon caps how far a report is carried forward to now. Reports arrive up to a poll or two late (adsb.lol
+// is asked every 15 s); further than this, a straight line says less than the last fix did.
+const maxDeadReckon = 30 * time.Second
+
+// reportAge is how many seconds p's report is carried forward to reach now.
+func reportAge(p feeds.Position, now time.Time) float64 {
+	return min(max(0, now.Sub(p.At).Seconds()), maxDeadReckon.Seconds())
+}
+
+// project places p t seconds after its report: carried along its track at its speed and rate of climb, or left where
+// it was without a track and speed. ok is false without an altitude, on the ground, or once it would have landed.
+func project(p feeds.Position, t float64) (geo.Point, float64, bool) {
+	h, ok := heightKm(p)
+	if !ok {
+		return geo.Point{}, 0, false
+	}
+	if p.SpeedKt == nil || p.TrackDeg == nil || t <= 0 {
+		return p.Point(), h, true
+	}
+	if p.VertRateFpm != nil {
+		h += float64(*p.VertRateFpm) * 0.3048 / 60 / 1000 * t
+	}
+	if h < 0 {
+		return geo.Point{}, 0, false
+	}
+	return geo.Destination(p.Point(), *p.TrackDeg, *p.SpeedKt*geo.KmPerNM/3600*t), h, true
+}
+
 // Motion is how a plane moves across the window: degrees right (+) and up (+) over the next motionSec seconds.
 type Motion struct {
 	OffsetDeg    float64 `json:"offset_deg"`
@@ -125,16 +148,17 @@ type Motion struct {
 // motionSec is the look-ahead for Motion: long enough to show a direction, short enough to stay straight.
 const motionSec = 10.0
 
-// motion is where p heads on screen, from its sight now and motionSec later; nil without a track and speed.
-func (w Window) motion(home geo.Point, p feeds.Position, now sight) *Motion {
-	h, ok := heightKm(p)
-	if !ok || p.SpeedKt == nil || p.TrackDeg == nil {
+// motion is where p heads on screen, from its sight at age seconds after its report and motionSec later; nil
+// without a track and speed.
+func (w Window) motion(home geo.Point, p feeds.Position, age float64, now sight) *Motion {
+	if p.SpeedKt == nil || p.TrackDeg == nil {
 		return nil
 	}
-	if p.VertRateFpm != nil {
-		h += float64(*p.VertRateFpm) * 0.3048 / 60 / 1000 * motionSec
+	pt, h, ok := project(p, age+motionSec)
+	if !ok {
+		return nil
 	}
-	next := w.sight(home, geo.Destination(p.Point(), *p.TrackDeg, *p.SpeedKt*geo.KmPerNM/3600*motionSec), h)
+	next := w.sight(home, pt, h)
 	return &Motion{OffsetDeg: geo.AngleDiff(next.offset, now.offset), ElevationDeg: next.elevation - now.elevation}
 }
 

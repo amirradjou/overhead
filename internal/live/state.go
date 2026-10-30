@@ -73,10 +73,14 @@ func (s *State) Update(e events.Position) {
 		return
 	}
 	s.pos[e.Hex] = e.Position
-	if day := e.At.Local().Format(time.DateOnly); day != s.day {
+	// A new day only moves forward, and a late report from before midnight counts toward its own day, not today.
+	day := e.At.Local().Format(time.DateOnly)
+	if day > s.day {
 		s.day, s.today = day, make(map[string]struct{})
 	}
-	s.today[e.Hex] = struct{}{}
+	if day == s.day {
+		s.today[e.Hex] = struct{}{}
+	}
 	s.track(e.Position)
 }
 
@@ -238,10 +242,12 @@ func (s *State) View(now time.Time) View {
 			pl.Info = &info
 			pl.ToDestinationKm, pl.ETAMin = eta(p, info.Route)
 		}
-		if h, ok := heightKm(p); ok {
-			sg := w.sight(s.Center, p.Point(), h)
+		// Placed where it should be now, not where it was last reported: the report may be several seconds old.
+		age := reportAge(p, now)
+		if pt, h, ok := project(p, age); ok {
+			sg := w.sight(s.Center, pt, h)
 			pl.ElevationDeg, pl.OffsetDeg, pl.InView = sg.elevation, sg.offset, w.sees(sg)
-			pl.Motion = w.motion(s.Center, p, sg)
+			pl.Motion = w.motion(s.Center, p, age, sg)
 			if !pl.InView {
 				pl.Coming = w.coming(s.Center, p, now)
 			}

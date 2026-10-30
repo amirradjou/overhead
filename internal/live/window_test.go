@@ -3,6 +3,7 @@ package live
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/amirradjou/overhead/internal/events"
 	"github.com/amirradjou/overhead/internal/feeds"
@@ -114,7 +115,7 @@ func TestMotion(t *testing.T) {
 	// Due south and flying east at 250 kt: from a south window it moves left across the glass, level.
 	p := flying(180, 15, 10000, 90, 250, 0)
 	h, _ := heightKm(p)
-	m := south.motion(pearson, p, south.sight(pearson, p.Point(), h))
+	m := south.motion(pearson, p, 0, south.sight(pearson, p.Point(), h))
 	if m == nil || m.OffsetDeg > -4 || m.OffsetDeg < -6 || math.Abs(m.ElevationDeg) > 0.2 {
 		t.Fatalf("motion = %+v, want about 5° left and level", m)
 	}
@@ -126,5 +127,42 @@ func TestDefaultWindowSeesAllRound(t *testing.T) {
 	v := s.View(t0)
 	if v.Window.FOVDeg != 360 || !v.Planes[0].InView {
 		t.Fatalf("view = %+v", v)
+	}
+}
+
+func TestPlacedWhereItIsNow(t *testing.T) {
+	// Reported 20 s ago just outside the window's left edge and flying into it at 250 kt (2.6 km in 20 s): by now
+	// it is inside, and the view should say so rather than call it neither in view nor coming.
+	p := flying(136.5, 14, 10000, 270, 250, 0)
+	s := &State{Center: pearson, RadiusKm: 60, Window: south}
+	p.At = t0.Add(-20 * time.Second)
+	s.Update(events.Position{Position: p})
+	got := s.View(t0).Planes[0]
+	if !got.InView || got.Coming != nil {
+		t.Fatalf("plane = in view %v, coming %+v, offset %.1f", got.InView, got.Coming, got.OffsetDeg)
+	}
+	// A report hours old is not carried across the map: dead reckoning stops at maxDeadReckon.
+	if a := reportAge(feeds.Position{At: t0.Add(-time.Hour)}, t0); a != maxDeadReckon.Seconds() {
+		t.Fatalf("reportAge = %v", a)
+	}
+}
+
+func TestWindowAzimuthNormalised(t *testing.T) {
+	for in, want := range map[float64]float64{540: 180, -90: 270, 360: 0, 200: 200} {
+		if got := (Window{AzimuthDeg: in, FOVDeg: 90}).normalised().AzimuthDeg; got != want {
+			t.Errorf("normalised(%v) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestTodayOnlyMovesForward(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 60}
+	midnight := time.Date(2026, 10, 31, 0, 0, 0, 0, time.Local)
+	s.Update(events.Position{Position: feeds.Position{Hex: "aaaaaa", Lat: 43.7, Lon: -79.6, At: midnight.Add(time.Minute)}})
+	s.Update(events.Position{Position: feeds.Position{Hex: "bbbbbb", Lat: 43.7, Lon: -79.6, At: midnight.Add(time.Minute)}})
+	// A late report from before midnight, for another aircraft.
+	s.Update(events.Position{Position: feeds.Position{Hex: "cccccc", Lat: 43.7, Lon: -79.6, At: midnight.Add(-time.Minute)}})
+	if v := s.View(midnight.Add(2 * time.Minute)); v.Today != 2 {
+		t.Fatalf("today = %d, want 2: a late report must not reset the day", v.Today)
 	}
 }

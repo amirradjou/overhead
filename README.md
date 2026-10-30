@@ -117,6 +117,7 @@ export OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38   # the window, not the airport
 export OVERHEAD_WINDOW_AZ=200                   # it faces south-south-west
 export OVERHEAD_WINDOW_FOV=100                  # and shows 100 degrees of sky
 export OVERHEAD_WINDOW_MIN_EL=8                 # over rooftops 8 degrees high
+export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a container runs in UTC)
 ./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
 ```
 

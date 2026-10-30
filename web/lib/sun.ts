@@ -5,7 +5,8 @@ const rad = Math.PI / 180;
 
 /** The sun's elevation above the horizon, in degrees, at a place and time. */
 export function sunElevation(lat: number, lon: number, when: Date): number {
-  const day = (when.getTime() - Date.UTC(when.getUTCFullYear(), 0, 1)) / 86_400_000; // days since 1 January, UTC
+  // Whole days since 1 January (UTC); the time of day enters once, through `hours`.
+  const day = Math.floor((when.getTime() - Date.UTC(when.getUTCFullYear(), 0, 1)) / 86_400_000);
   const hours = when.getUTCHours() + when.getUTCMinutes() / 60 + when.getUTCSeconds() / 3600;
   const g = ((2 * Math.PI) / 365) * (day + (hours - 12) / 24); // fractional year, radians
 
