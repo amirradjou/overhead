@@ -52,9 +52,16 @@ def test_a_few_days_of_history(tmp_path: Path) -> None:
                     180,
                     15,
                     9000,
-                    {"type_code": "BCS3", "registration": "C-GKWA"},
+                    {"type_code": "BCS3", "registration": "C-GKWA", "callsign": "ACA811"},
                 )
             )
+            # A private Cessna that comes by twice as often (two passes, 40 minutes apart): it must never be named
+            # as the month's regular on a screen others can see.
+            for minutes in (20, 60):
+                at = T0 - d * day + timedelta(hours=h - 6, minutes=minutes)
+                planes.append(
+                    ("ce55a0", at, 180, 8, 2500, {"type_code": "C172", "registration": "C-GPVT", "callsign": "CGPVT"})
+                )
     # A one-off An-124 two days ago, and two newcomers today in different hours.
     planes.append(("a12400", T0 - 2 * day, 180, 20, 12000, {"type_code": "A124"}))
     planes.append(("new001", T0 - timedelta(hours=1), 0, 10, 8000, {"type_code": "B38M"}))
@@ -66,9 +73,10 @@ def test_a_few_days_of_history(tmp_path: Path) -> None:
     assert "3 aircraft passed by for the first time today." in got
     assert "The rarest type this month is the A124, seen once." in got
     assert "C-GKWA is this month's regular: 8 visits." in got
-    # Today in Toronto has passes at 08:00, 11:00, 11:10 and 13:00 (twice): two hours tie on 2, the earlier wins.
-    assert "The busiest hour today was 11:00 to 12:00, with 2 aircraft." in got
-    assert got[0] == "One plane crossed your window today."
+    assert not any("C-GPVT" in f for f in got), got
+    # Today in Toronto: 08:00, 08:20, 09:00, 11:00, 11:10, 13:00 (twice), 13:20, 14:00. The 13:00 hour has three.
+    assert "The busiest hour today was 13:00 to 14:00, with 3 aircraft." in got
+    assert got[0] == "2 planes crossed your window today."  # the A220 and the Cessna, both south
 
 
 def test_cli_writes_facts_for_the_live_api(tmp_path: Path) -> None:

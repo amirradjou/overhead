@@ -84,7 +84,7 @@ def facts(con: duckdb.DuckDBPyConnection, now: datetime, tz: str, window: Window
         regular = con.execute(
             """
             SELECT registration, count(*) AS n FROM passes
-            WHERE local_day >= ? AND registration IS NOT NULL AND NOT private
+            WHERE local_day >= ? AND registration IS NOT NULL AND commercial
             GROUP BY registration ORDER BY n DESC, registration LIMIT 1
             """,
             [month_start],
@@ -103,8 +103,14 @@ def _prepare(con: duckdb.DuckDBPyConnection, tz: str, w: Window) -> None:
         f"""
         CREATE OR REPLACE TEMP TABLE passes AS
         SELECT *, (first_seen AT TIME ZONE getvariable('tz'))::DATE AS local_day,
-                  hour(first_seen AT TIME ZONE getvariable('tz')) AS local_hour
+                  hour(first_seen AT TIME ZONE getvariable('tz')) AS local_hour,
+                  -- An airline flight, as the live API's public mode has it (internal/live: Commercial): only these
+                  -- may be named by registration on a screen others can see (README privacy rule).
+                  regexp_full_match(coalesce(callsign, ''), '[A-Z]{{3}}[0-9][0-9A-Z]{{0,3}}')  -- {{}}: an f-string
+                      AND NOT military AND NOT private AS commercial
         FROM ({passes_sql()})
+        -- Passes that were in the air at some point: aircraft parked or taxiing at an airport are not "overhead".
+        WHERE lowest_alt_ft IS NOT NULL
         """
     )
     # The window's geometry, as internal/live works it out: bearing and distance from home, the angle above the
