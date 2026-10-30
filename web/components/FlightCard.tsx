@@ -99,7 +99,7 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
             </p>
           </>
         ) : (
-          <p className="route">{operator(plane) || (plane.near ? "Passing close by" : "Route unknown")}</p>
+          <p className="route">{operator(plane) || withoutRoute(plane, airport)}</p>
         )}
         <p className="trip-note">
           {plane.distance_km < 10 ? plane.distance_km.toFixed(1) : Math.round(plane.distance_km)} km away ·
@@ -221,4 +221,14 @@ function tiles(p: Plane, w: Window): { label: string; value: string; note: strin
     );
   }
   return out;
+}
+
+// withoutRoute says what a plane with no known route is doing: landing at or leaving the followed airport, or
+// passing close by.
+function withoutRoute(p: Plane, ap?: FollowedAirport): string {
+  const name = ap?.name ?? "the airport";
+  if (p.airport?.op === "arriving") return `Landing at ${name}`;
+  if (p.airport?.op === "departing") return `Leaving ${name}`;
+  if (p.airport) return `On the ground at ${name}`;
+  return p.near ? "Passing close by" : "Route unknown";
 }

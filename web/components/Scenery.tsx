@@ -18,13 +18,12 @@ import { mix } from "@/lib/skyColour";
 import type { Window } from "@/lib/types";
 
 // Colours of the view below the horizon at a few sun heights, blended in between like the sky's: the lake hazy at
-// its horizon and deep blue close in, the islands' trees with their autumn colour, the airfield's grass and runway,
+// its horizon and deep blue close in, the islands' forest, the airfield's grass and runway,
 // the harbour front's concrete. Held below the photograph's brightness, as the sky is, for a TV that is on all day.
 interface Palette {
   lakeFar: string;
   lakeNear: string;
   trees: string;
-  autumn: string;
   grass: string;
   runway: string;
   apron: string;
@@ -33,6 +32,7 @@ interface Palette {
   wallLit: string;
   roof: string;
   land: string;
+  sand: string;
 }
 
 const keys: { sun: number; c: Palette }[] = [
@@ -42,7 +42,6 @@ const keys: { sun: number; c: Palette }[] = [
       lakeFar: "#141c2c",
       lakeNear: "#060a13",
       trees: "#06090b",
-      autumn: "#0d0d0a",
       grass: "#0a0e0e",
       runway: "#1a1d22",
       apron: "#1d2026",
@@ -51,6 +50,7 @@ const keys: { sun: number; c: Palette }[] = [
       wallLit: "#0e131b",
       roof: "#141922",
       land: "#080b10",
+      sand: "#14161a",
     },
   },
   {
@@ -59,7 +59,6 @@ const keys: { sun: number; c: Palette }[] = [
       lakeFar: "#4b4c69",
       lakeNear: "#141b2e",
       trees: "#11160f",
-      autumn: "#2a2414",
       grass: "#1b2219",
       runway: "#3a3d45",
       apron: "#40434b",
@@ -68,6 +67,7 @@ const keys: { sun: number; c: Palette }[] = [
       wallLit: "#2c303a",
       roof: "#30343d",
       land: "#191c22",
+      sand: "#3a3a3c",
     },
   },
   {
@@ -76,7 +76,6 @@ const keys: { sun: number; c: Palette }[] = [
       lakeFar: "#a68f8f",
       lakeNear: "#253650",
       trees: "#242b17",
-      autumn: "#5e4a22",
       grass: "#4a5235",
       runway: "#6e6e72",
       apron: "#7a797b",
@@ -85,15 +84,15 @@ const keys: { sun: number; c: Palette }[] = [
       wallLit: "#9b8576",
       roof: "#837f7f",
       land: "#3a3a36",
+      sand: "#9c8a72",
     },
   },
   {
     sun: 12,
     c: {
-      lakeFar: "#7f93a6",
-      lakeNear: "#223a57",
+      lakeFar: "#8ea2b4",
+      lakeNear: "#34567a",
       trees: "#2f3a22",
-      autumn: "#7b6a33",
       grass: "#5f6c4c",
       runway: "#7c8288",
       apron: "#8b9096",
@@ -102,6 +101,7 @@ const keys: { sun: number; c: Palette }[] = [
       wallLit: "#b3b6b8",
       roof: "#a3a8ad",
       land: "#47504a",
+      sand: "#a39a80",
     },
   },
 ];
@@ -149,6 +149,19 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
   );
   const c = useMemo(() => palette(sunStep), [sunStep]);
   const night = sunStep < -5;
+  const forestLight = useMemo(() => {
+    // The sun's direction on screen, as the filter's light: straight ahead is from the top.
+    const off = (sunDir * Math.PI) / 180;
+    const azimuth = ((Math.atan2(-Math.cos(off), Math.sin(off)) * 180) / Math.PI + 360) % 360;
+    if (night) return { azimuth, elevation: 60, colour: "#3a4356" };
+    const elevation = Math.max(8, Math.min(65, sunStep));
+    const colour = sunStep < 4 ? "#ffc89a" : sunStep < 12 ? "#ffe6c8" : "#fff8ec";
+    return { azimuth: Math.round(azimuth), elevation, colour };
+  }, [sunDir, sunStep, night]);
+  const grove = useMemo(
+    () => groves(night ? 0 : Math.min(1, Math.max(0, (sunStep + 6) / 14))),
+    [night, sunStep],
+  );
   const glints = useMemo(
     () => (glitter ? glitterPath(shapes.p, w, glitter) : null),
     [
@@ -174,18 +187,87 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
           <stop offset="1" stopColor={c.lakeFar} stopOpacity="0" />
         </linearGradient>
         {/* Under the caption the view darkens, so its words read over buildings as well as water. */}
-        <linearGradient id="scrim" x1="0" y1="560" x2="0" y2="820" gradientUnits="userSpaceOnUse">
+        <linearGradient id="scrim" x1="0" y1="610" x2="0" y2="850" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#03060c" stopOpacity="0" />
           <stop offset="0.45" stopColor="#03060c" stopOpacity="0.62" />
           <stop offset="1" stopColor="#03060c" stopOpacity="0.88" />
         </linearGradient>
-        <pattern id="autumn" width="23" height="11" patternUnits="userSpaceOnUse">
-          {/* Yellow, rust and red crowns among the green, scattered so no row or column shows. */}
-          <circle cx="3" cy="2" r="1.3" fill={c.autumn} />
-          <circle cx="11" cy="7.5" r="1" fill={mix(c.autumn, "#9a3b1e", night ? 0 : 0.4)} />
-          <circle cx="17.5" cy="3.5" r="1.4" fill={c.autumn} />
-          <circle cx="7" cy="9" r="0.8" fill={mix(c.autumn, "#c08a2a", night ? 0 : 0.5)} />
-          <circle cx="20.5" cy="9.5" r="0.9" fill={mix(c.autumn, "#9a3b1e", night ? 0 : 0.25)} />
+        {/* The islands' forest: a canopy of crowns (fine noise as a height map, lit from the sun's real direction),
+            in groves whose colour runs from dark green through olive to October's yellows and rusts (coarse noise
+            through a palette), with a ragged tree line where the crowns break the outline. Drawn once per change
+            of light, then cached with the rest of the scenery. */}
+        <filter
+          id="forest"
+          filterUnits="userSpaceOnUse"
+          x="-20"
+          y={hy - 30}
+          width="1040"
+          height={1030 - hy}
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.24 0.42"
+            numOctaves="3"
+            seed="3"
+            result="crowns"
+          />
+          <feDiffuseLighting
+            in="crowns"
+            surfaceScale="3.4"
+            diffuseConstant="1.3"
+            lightingColor={forestLight.colour}
+            result="shade"
+          >
+            <feDistantLight azimuth={forestLight.azimuth} elevation={forestLight.elevation} />
+          </feDiffuseLighting>
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.018 0.05"
+            numOctaves="2"
+            seed="11"
+            result="groves"
+          />
+          <feColorMatrix
+            in="groves"
+            type="matrix"
+            values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"
+            result="grey"
+          />
+          <feComponentTransfer in="grey" result="tint">
+            <feFuncR type="discrete" tableValues={grove.r} />
+            <feFuncG type="discrete" tableValues={grove.g} />
+            <feFuncB type="discrete" tableValues={grove.b} />
+          </feComponentTransfer>
+          <feBlend in="tint" in2="shade" mode="multiply" result="lit" />
+          <feDisplacementMap
+            in="SourceAlpha"
+            in2="crowns"
+            scale="3.2"
+            xChannelSelector="R"
+            yChannelSelector="G"
+            result="ragged"
+          />
+          <feComposite in="lit" in2="ragged" operator="in" />
+        </filter>
+        {/* Ripples: long, low swells across the water, lighter crests over darker troughs. */}
+        <filter
+          id="ripples"
+          filterUnits="userSpaceOnUse"
+          x="-20"
+          y={hy}
+          width="1040"
+          height={1020 - hy}
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.22" numOctaves="2" seed="4" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 2.4 0 -1.15" />
+        </filter>
+        <filter id="mirror" x="-2%" y="-10%" width="104%" height="120%">
+          <feGaussianBlur stdDeviation="0.5 1.4" />
+        </filter>
+        <pattern id="mowing" width="1000" height="7" patternUnits="userSpaceOnUse">
+          <rect width="1000" height="3.5" fill="#ffffff" opacity="0.07" />
         </pattern>
         <clipPath id="island-land">
           <path d={shapes.islandsGround} />
@@ -199,16 +281,43 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
           opacity={glitter!.strength}
         />
       )}
+      <rect
+        x="-20"
+        y={hy}
+        width="1040"
+        height={1020 - hy}
+        fill="#fff"
+        filter="url(#ripples)"
+        opacity={night ? 0.05 : 0.16}
+      />
       <path d={shapes.mainland} fill={c.land} />
-      {/* The islands: their trees' tops, then the ground, in one colour, so the canopy stands a little proud. */}
-      <path d={shapes.islandsCanopy} fill={c.trees} />
-      <path d={shapes.islandsGround} fill={c.trees} />
-      <path d={shapes.islandsCanopy} fill="url(#autumn)" opacity="0.4" />
+      {/* The trees mirrored in the still water along the shores: as far below the shoreline as they stand above. */}
+      <path
+        d={shapes.islandsMirror}
+        fill={mix(c.trees, c.lakeNear, 0.35)}
+        opacity="0.55"
+        filter="url(#mirror)"
+      />
+      <path
+        d={shapes.islandsGround}
+        fill={c.trees}
+        stroke={c.sand}
+        strokeWidth="1"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path d={shapes.islandsCanopy} fill={c.trees} filter="url(#forest)" />
       <g clipPath="url(#island-land)">
         <path d={shapes.airfield} fill={c.grass} />
+        <path d={shapes.airfield} fill="url(#mowing)" />
       </g>
       <path d={shapes.aprons} fill={c.apron} />
-      <path d={shapes.runways} fill={c.runway} />
+      <path
+        d={shapes.runways}
+        fill={c.runway}
+        stroke={mix(c.runway, "#ffffff", 0.35)}
+        strokeWidth="0.8"
+        vectorEffect="non-scaling-stroke"
+      />
       <path
         d={shapes.pierLines}
         fill="none"
@@ -281,7 +390,7 @@ function Scenery({ scenery, home, w, sunAlt, glitter, haze, sunOffset }: Props) 
         </g>
       )}
       <rect x="-20" y={hy - 70} width="1040" height="130" fill="url(#haze)" />
-      <rect x="-20" y="560" width="1040" height="480" fill="url(#scrim)" />
+      <rect x="-20" y="610" width="1040" height="430" fill="url(#scrim)" />
     </svg>
   );
 }
@@ -293,6 +402,7 @@ interface Shapes {
   mainland: string;
   islandsGround: string;
   islandsCanopy: string;
+  islandsMirror: string;
   airfield: string;
   runways: string;
   aprons: string;
@@ -332,7 +442,8 @@ function draw(h: Harbour, p: Projector, sunDeg: number): Shapes {
     mainland: ringPath(p, h.mainland, ground),
     islandsGround: join(h.islands.map((r) => ringPath(p, r, ground))),
     islandsCanopy: join(h.islands.map((r) => ringPath(p, r, ground + 16))),
-    airfield: join(h.runways.map((r) => localPath(p, runwayStrip(p, r.line, r.width, 90), ground))),
+    islandsMirror: join(h.islands.map((r) => ringPath(p, r, h.lake_m - 14))),
+    airfield: join(h.runways.map((r) => localPath(p, runwayStrip(p, r.line, r.width, 170), ground))),
     runways: join(h.runways.map((r) => localPath(p, runwayStrip(p, r.line, r.width), ground + 0.5))),
     aprons: join(h.aprons.map((r) => ringPath(p, r, ground + 0.3))),
     pierLines: join(h.piers.filter((q) => !q.area).map((q) => linePath(p, q.pts, ground + 1))),
@@ -411,4 +522,24 @@ function glitterPath(p: Projector, w: Window, g: NonNullable<Props["glitter"]>):
     d += `M${a.toFixed(1)},${c2.toFixed(1)}L${b.toFixed(1)},${c2.toFixed(1)}L${b.toFixed(1)},${c3.toFixed(1)}L${a.toFixed(1)},${c3.toFixed(1)}Z`;
   }
   return d;
+}
+
+// groves is the forest's palette, as the filter's colour tables: mostly dark greens and olive, with patches of
+// October yellow, ochre and rust where the coarse noise strays from its middle. day scales it from night's near-black.
+function groves(day: number): { r: string; g: string; b: string } {
+  const palette: [number, number, number][] = [
+    [0.52, 0.22, 0.1], // rust
+    [0.66, 0.52, 0.16], // ochre
+    [0.4, 0.42, 0.16], // olive
+    [0.22, 0.3, 0.13], // green
+    [0.14, 0.21, 0.1], // dark green
+    [0.3, 0.35, 0.14], // light olive
+    [0.17, 0.24, 0.11], // green
+    [0.5, 0.46, 0.17], // yellow-olive
+    [0.6, 0.36, 0.12], // orange
+    [0.46, 0.17, 0.1], // red
+  ];
+  const k = 0.12 + 0.88 * day;
+  const col = (i: number) => palette.map((c) => (c[i]! * k * 1.25).toFixed(3)).join(" ");
+  return { r: col(0), g: col(1), b: col(2) };
 }
