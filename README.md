@@ -89,10 +89,27 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 
 | | Milestone | Done when |
 |---|---|---|
-| M0 | Poller + terminal table of planes within 30 km, two feeds merged | a one-hour run with no gap over 30 s and no duplicate aircraft |
+| M0 ✅ | Poller + terminal table of planes within 30 km, two feeds merged | a one-hour run with no gap over 30 s and no duplicate aircraft — **720 polls, longest gap 5 s, no duplicates, see [M0 results](#m0-results)** |
 | M1 | Event pipeline (RabbitMQ) and enrichment with caching | at least 90% of commercial flights shown with type and route; under 5 API calls per new plane; stopping any consumer for 10 minutes loses no positions |
 | M2 | Screen v1: live map + closest-plane card over SSE | runs a full day in the TV browser without a reload |
 | M3 | History: S3 → Snowpipe → Snowflake, flights stitched | a week of data; Snowflake row counts reconcile with the poller's own counts |
 | M4 | Stats + notebooks, "today / this month" panels on the screen | rarest-type and busiest-hour panels match the notebook numbers |
 | M5 | Alerts to Telegram | replaying a stored day fires exactly the expected alerts, no duplicates |
 | M6 | Terraform for AWS + Snowflake; public demo | `make up` / `make down` from a clean account; demo follows the privacy rule |
+
+## M0 results
+
+`overhead watch -for 1h`, run 2026-10-29 from 22:06 to 23:06 EDT on the 30 km circle round Toronto Pearson
+(commit 74f6dd1; the later 583104d only strips control characters from feed text):
+
+| | |
+|---|---|
+| Polls | 720, every 5 s; all 720 had data |
+| Longest gap between updates | 5 s (limit 30 s) |
+| adsb.fi | 720 answers, 0 errors |
+| adsb.lol | 240 answers (one every 15 s), 0 errors, no 429s |
+| Aircraft | 87 distinct, 10–25 at once |
+| Duplicates | none: in no poll was one callsign on two addresses, or two airborne aircraft within 300 m and 200 ft |
+
+Before adsb.lol was spaced to 15 s, asking it every 5 s drew HTTP 429 after about three and a half minutes; the
+poller backed off and adsb.fi carried the picture with no gap.
