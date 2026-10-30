@@ -3,7 +3,8 @@
 The planes above home, live — on the TV across the room, with the history of everything that flew over and an alert
 when something rare does. No radio hardware: it reads free community flight-tracking feeds.
 
-> **Status: scaffold.** This README is the spec. The milestones at the end track what is built.
+> **Status: M0 (poller + terminal table) built.** This README is the spec. The milestones at the end track what is
+> built.
 
 ## What it is
 
@@ -15,13 +16,15 @@ what was the rarest aircraft this month, what is the busiest hour over the stree
 
 ## Data sources
 
-Personal, non-commercial use; every source is credited on screen. Check each one's current terms and rate limits
-before M0 and stay well inside them.
+Personal, non-commercial use; every source is credited on screen. Terms and limits were checked on 2026-10-29: overhead
+asks adsb.fi every 5 s and adsb.lol every 15 s (one request every 5 s drew 429s within minutes), sends a User-Agent
+naming the project, backs off after errors and honours Retry-After.
 
 | Source | Gives | Notes |
 |---|---|---|
-| adsb.lol | live positions in a radius | free, no key, unfiltered |
-| airplanes.live | live positions in a radius | free for non-commercial use, about one request a second |
+| adsb.lol | live positions in a radius | free, no key, unfiltered; limits are "dynamic", and a key (for feeders) is planned |
+| adsb.fi | live positions in a radius | free for personal, non-commercial use; one request a second; credit with a link |
+| airplanes.live | live positions in a radius | free for non-commercial use, about one request a second; now answers 403 until the project is approved by email, so it is off by default |
 | OpenSky Network | live positions (fallback) and an aircraft database | free account, daily request credits |
 | adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free |
 | planespotters.net | a photo of that exact airframe | photographer credit required |
@@ -69,6 +72,18 @@ commercial flights only and never registrations or owners of private aircraft.
 
 Cost: the Snowflake trial is time-limited — develop on DuckDB locally, move to Snowflake for M3, and keep the
 warehouse at X-Small with auto-suspend.
+
+## Run it
+
+```sh
+make build
+./bin/overhead watch                 # live table round Toronto Pearson, redrawn every 5 s; Ctrl-C prints a summary
+OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38 ./bin/overhead watch -radius 20
+./bin/overhead watch -for 1h > run.log   # M0's check: one line per poll, then pass/fail on gaps and duplicates
+```
+
+`-feeds adsb.lol,adsb.fi` is the default; `airplanes.live` can be added once it grants access. Airport ground
+vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 
 ## Milestones
 
