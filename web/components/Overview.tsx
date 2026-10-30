@@ -1,3 +1,5 @@
+import { bearingDeg, shown } from "@/lib/airport";
+import { greatCircleKm } from "@/lib/progress";
 import { overviewTurn, polar } from "@/lib/sky";
 import type { View } from "@/lib/types";
 
@@ -9,6 +11,12 @@ export default function Overview({ view }: { view: View }) {
   const turn = overviewTurn(w);
   const wedge = w.fov_deg >= 360 ? null : sector(-w.fov_deg / 2, w.fov_deg / 2, r);
   const north = polar(-turn, r + 7);
+  // Following an airport, the disc shows the nearer sky: what lands and takes off there is within 20 km.
+  const reach = view.focused ? Math.min(view.radius_km, 20) : view.radius_km;
+  const ap = view.airport;
+  const apAt = ap
+    ? polar(bearingDeg(view.center, ap) - turn, (Math.min(greatCircleKm(view.center, ap), reach) / reach) * r)
+    : null;
   return (
     <svg className="overview" viewBox="-60 -60 120 120" aria-hidden="true">
       <circle className="overview-edge" r={r} />
@@ -16,13 +24,11 @@ export default function Overview({ view }: { view: View }) {
       <text className="overview-north" x={north.x} y={north.y}>
         N
       </text>
-      {view.planes
+      {apAt && <rect className="overview-airport" x={apAt.x - 2} y={apAt.y - 2} width={4} height={4} />}
+      {shown(view)
         .filter((p) => !p.on_ground)
         .map((p) => {
-          const at = polar(
-            p.bearing_deg - turn,
-            (Math.min(p.distance_km, view.radius_km) / view.radius_km) * r,
-          );
+          const at = polar(p.bearing_deg - turn, (Math.min(p.distance_km, reach) / reach) * r);
           const cls = p.in_view ? "is-in-view" : p.coming ? "is-coming" : "";
           return <circle key={p.hex} className={`overview-plane ${cls}`} cx={at.x} cy={at.y} r={1.8} />;
         })}

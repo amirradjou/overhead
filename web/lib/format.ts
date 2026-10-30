@@ -1,6 +1,7 @@
 // Words and numbers for the screen. Plain language for a living room: km/h rather than knots, "south-west" rather
 // than 225°; altitude stays in feet, the unit pilots and every flight app use.
-import type { Airport, Plane } from "./types";
+import { looksDown } from "./sky";
+import type { Airport, Plane, Window } from "./types";
 
 const thousands = new Intl.NumberFormat("en-CA");
 
@@ -148,10 +149,14 @@ const sides = {
   distance: "far off, straight ahead",
 } as const;
 
-/** "over the rooftops in about 2 min": where and when a plane comes into view. */
-export function arrival(p: Plane): string {
+/**
+ * "over the rooftops in about 2 min": where and when a plane comes into view. From a window that looks down past the
+ * horizon, nothing stands opposite: a plane rising into view comes from below.
+ */
+export function arrival(p: Plane, w?: Window): string {
   if (!p.coming) return "";
   const s = Math.round(p.coming.in_s);
   const when = s < 45 ? "any moment now" : `in about ${Math.round(s / 60)} min`;
-  return `${sides[p.coming.side]} ${when}`;
+  const side = p.coming.side === "rooftops" && w && looksDown(w) ? "from below" : sides[p.coming.side];
+  return `${side} ${when}`;
 }

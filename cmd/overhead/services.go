@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -147,6 +149,13 @@ func runLive(ctx context.Context, args []string) error {
 	web := fs.String("web", "", "serve the screen's static files from this directory (web/out)")
 	factsPath := fs.String("facts", dataPath("facts.json"), "facts for the screen, as overhead-stats writes them")
 	public := fs.Bool("public", false, "commercial flights only (the README privacy rule for the public demo)")
+	airport := fs.String("airport", env("OVERHEAD_AIRPORT", ""),
+		"follow this airport (ICAO: "+strings.Join(slices.Sorted(maps.Keys(live.Airports)), ", ")+"): its take-offs and landings only, with more about each (OVERHEAD_AIRPORT)")
+	nearKm, err := envFloat("OVERHEAD_NEAR_KM", 0)
+	if err != nil {
+		return usageError{err.Error()}
+	}
+	fs.Float64Var(&nearKm, "near-km", nearKm, "also show planes this close to the window, in a straight line; with it, only those (OVERHEAD_NEAR_KM)")
 	w, err := addWindowFlags(fs)
 	if err != nil {
 		return err
@@ -167,11 +176,23 @@ func runLive(ctx context.Context, args []string) error {
 	if err := checkWindow("live", *w); err != nil {
 		return err
 	}
+	var followed *live.Airport
+	if *airport != "" {
+		a, ok := live.Airports[strings.ToUpper(*airport)]
+		if !ok {
+			return usageError{fmt.Sprintf("overhead live: -airport %q is not one overhead knows (%s)", *airport,
+				strings.Join(slices.Sorted(maps.Keys(live.Airports)), ", "))}
+		}
+		followed = &a
+	}
+	if nearKm < 0 {
+		return usageError{"overhead live: -near-km must not be negative"}
+	}
 	// Everything below stops with ctx; a listener that fails cancels it, so the command exits with its error rather
 	// than draining the queues with no one to serve.
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
-	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: *w}
+	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: *w, Airport: followed, NearKm: nearKm}
 	srv := &live.Server{State: state}
 	if *web != "" {
 		srv.Web = http.FileServer(http.Dir(*web))

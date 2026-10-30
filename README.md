@@ -69,8 +69,14 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
    north; between planes, a fact from the history, the next sunrise or sunset and the moon. Calm by design: slow
    motion, dimmer at night, a slight drift of the whole scene so nothing burns into a TV, and days of running without
    a reload in a TV browser as old as Chromium 79. Readable from the sofa: no text under 23 px at 1080p, every label
-   at least 4.5:1 against the sky behind it, all text inside a 5% safe area. Still to come: the planets, saying so
-   when cloud hides the planes, and dimming nearly to black late at night when nothing is flying.
+   at least 4.5:1 against the sky behind it, all text inside a 5% safe area. From high up, where the window looks
+   down past the horizon, the bottom of the view is water or land below the horizon rather than rooftops.
+   It can follow one airport (`OVERHEAD_AIRPORT`, Billy Bishop for now): then it shows only that airport's landings
+   and take-offs and planes very close to the window (`OVERHEAD_NEAR_KM`), each told in full (on final for runway
+   26 and when it touches down, or how long ago it took off; its height against the window's; where to look; the
+   airframe), with a board of what is landing, taking off and taxiing there and the runway in use. Still to come:
+   the planets, saying so when cloud hides the planes, and dimming nearly to black late at night when nothing is
+   flying.
 7. **Heads-up** — consumes the alerts queue: an optional message on the phone (Telegram) when something worth
    getting up for is about to pass the window: a rare type, an unusually low pass, an emergency squawk
    (7500/7600/7700), a first-ever visitor. Each is sent once, with no duplicates.
@@ -79,7 +85,8 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
    alert. It goes up to prove the cloud path and comes down after; the screen never depends on it.
 9. **Window setup** — the window is its direction (a phone compass set to true north, or the wall's bearing on a map;
    magnetic north is about 10° off in Toronto), its left and right edges and its top as seen from where you sit, the
-   lowest angle visible over the roofs opposite (a phone level sighted along the roofline), and the home's height
+   lowest angle visible over the roofs opposite (a phone level sighted along the roofline; negative, below the
+   horizon, from high up with nothing opposite), and the home's height
    above sea level (OVERHEAD_HOME_ELEV); [docs/setup.md](docs/setup.md#1-home-and-window) says how to measure each.
    Still to come: a setup view that draws every plane round home on a full-sky strip with the window over it, so the
    numbers can be nudged until a plane you see enters where the screen says.
@@ -180,6 +187,13 @@ hours. A fact appears only once the history can back it: "first time today" afte
 month's rarest type and regulars after three.
 
 Without window settings the screen shows the whole sky round home, down to 5 degrees.
+
+To follow Billy Bishop's landings and take-offs and the planes within 3 km of the window, and nothing else:
+
+```sh
+export OVERHEAD_AIRPORT=CYTZ OVERHEAD_NEAR_KM=3   # in .env for compose
+./bin/overhead live -web web/out
+```
 
 Heads-ups (M5) watch the alerts queue with the same window settings; with a Telegram bot they reach the phone,
 without one they are only logged. A stored day can be replayed to see what would have been sent:

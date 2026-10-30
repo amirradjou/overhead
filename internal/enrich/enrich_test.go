@@ -171,6 +171,8 @@ func newWorker(t *testing.T) (*Worker, *fakeAPIs, *time.Time) {
 			"POE672": {Callsign: "POE672", Airline: "Porter Airlines"},
 			"POE111": {Callsign: "POE111"},
 			"ACA101": {Callsign: "ACA101"},
+			// As adsbdb answered on 2026-10-30.
+			"PTR2943": {Callsign: "PTR2943", FlightIATA: "2943", Airline: "Nova Scotia Department of Lands and Forests", AirlineICAO: "PTR"},
 		},
 		photos: map[string]*events.Photo{"c08861": {Thumbnail: "t.jpg", Link: "l", Photographer: "p"}},
 		calls:  map[string]int{},
@@ -207,6 +209,26 @@ func TestWorkerCallsEachAPIOncePerNewPlane(t *testing.T) {
 	c := w.Counts()
 	if c.Calls != 3 || c.NewAircraft != 1 || apis.calls["route"] != 1 {
 		t.Fatalf("counts = %+v, calls = %v", c, apis.calls)
+	}
+}
+
+func TestWorkerCorrectsKnownWrongAirlines(t *testing.T) {
+	w, _, _ := newWorker(t)
+	ctx := context.Background()
+	job := events.EnrichJob{Hex: "c0aaaa", Callsign: "PTR2943"}
+	for i := range 2 { // fetched, then from the cache
+		got, err := w.Enrich(ctx, job)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r := got.Route; r == nil || r.Airline != "Porter Airlines" || r.FlightIATA != "PD2943" || r.AirlineICAO != "PTR" {
+			t.Fatalf("enrich %d: route = %+v", i, got.Route)
+		}
+	}
+	// Airlines adsbdb has right are left alone.
+	got, err := w.Enrich(ctx, events.EnrichJob{Hex: "c08861", Callsign: "POE672"})
+	if err != nil || got.Route == nil || got.Route.Airline != "Porter Airlines" {
+		t.Fatalf("POE672: %+v, %v", got.Route, err)
 	}
 }
 

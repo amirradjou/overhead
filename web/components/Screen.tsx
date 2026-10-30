@@ -1,9 +1,11 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import AirportBoard from "./AirportBoard";
 import Caption from "./Caption";
 import Overview from "./Overview";
 import Sky from "./Sky";
+import { board, shown } from "@/lib/airport";
 import { sourceHomes } from "@/lib/format";
 import { comingNext, inView } from "@/lib/pick";
 import { skyColours } from "@/lib/skyColour";
@@ -30,7 +32,7 @@ export default function Screen() {
   );
   const phase = sun ? skyPhase(sun.alt) : "night";
   const colours = skyColours(sun?.alt ?? -30);
-  const planes = view?.planes ?? [];
+  const planes = shown(view);
   const visible = inView(planes);
   const next = comingNext(planes)[0];
   const sources = view?.sources ?? [];
@@ -54,6 +56,7 @@ export default function Screen() {
             {status !== "live" && <span className="clock-status">reconnecting</span>}
           </p>
           {view && <Overview view={view} />}
+          {view?.airport && <AirportBoard airport={view.airport} rows={board(view)} />}
           <Caption
             plane={visible[0]}
             alsoInView={visible.length - 1}
@@ -62,6 +65,7 @@ export default function Screen() {
             now={now}
             status={status}
             home={view ? { lat: view.center.lat, lon: view.center.lon, window: view.window } : undefined}
+            airport={view?.airport}
           />
           <p className="credits">
             <span>

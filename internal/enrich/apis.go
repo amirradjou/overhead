@@ -209,6 +209,27 @@ func (r *adsbdbRoute) toRoute() *events.Route {
 	return out
 }
 
+// airlineFixes corrects adsbdb's airline for callsign prefixes it has wrong. It gives PTR to the Nova Scotia
+// Department of Lands and Forests, but PTR is Porter's Dash 8 fleet, in and out of Billy Bishop all day: 37 flights
+// on 2026-10-30, every one a DH8D (Porter's jets fly as POE, which adsbdb has right).
+var airlineFixes = map[string]struct{ name, iata string }{
+	"PTR": {"Porter Airlines", "PD"},
+}
+
+// corrected returns r with a known-wrong airline replaced, and its flight number given the airline's IATA code when
+// adsbdb left only the digits.
+func corrected(r events.Route) events.Route {
+	fix, ok := airlineFixes[r.AirlineICAO]
+	if !ok {
+		return r
+	}
+	r.Airline = fix.name
+	if r.FlightIATA != "" && r.FlightIATA[0] >= '0' && r.FlightIATA[0] <= '9' {
+		r.FlightIATA = fix.iata + r.FlightIATA
+	}
+	return r
+}
+
 func (a adsbdbAirport) toAirport() events.Airport {
 	return events.Airport{
 		ICAO: feeds.Printable(a.ICAO), IATA: feeds.Printable(a.IATA), Name: feeds.Printable(a.Name),

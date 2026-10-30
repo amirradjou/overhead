@@ -140,6 +140,10 @@ describe("format", () => {
     expect(arrival(c("rooftops", 30))).toBe("over the rooftops any moment now");
     expect(arrival(c("above", 300))).toBe("over the house in about 5 min");
     expect(arrival(plane())).toBe("");
+    // From high up there are no rooftops opposite: it rises from below.
+    const high = { azimuth_deg: 163, fov_deg: 100, min_elevation_deg: -5, home_elevation_m: 218 };
+    expect(arrival(c("rooftops", 130), high)).toBe("from below in about 2 min");
+    expect(arrival(c("left", 130), high)).toBe("from the left in about 2 min");
   });
 });
 

@@ -34,6 +34,10 @@ type State struct {
 	Public bool
 	// Window is the view the screen draws; the zero value is DefaultWindow.
 	Window Window
+	// Airport, when set, is the airport the screen follows; NearKm, when set, how close to the window (in a straight
+	// line) a plane counts as very close. With either, the screen shows those planes only (View.Focused).
+	Airport *Airport
+	NearKm  float64
 
 	mu       sync.Mutex
 	pos      map[string]feeds.Position
@@ -43,6 +47,10 @@ type State struct {
 	flights  map[string]*flight
 	received uint64
 	pruned   time.Time
+
+	runway               string // the runway the latest take-off or landing at Airport used
+	runwayAt             time.Time
+	arrivals, departures map[string]struct{} // flights that landed at or took off from Airport today
 
 	facts                               []string
 	predicted                           map[string]prediction
@@ -61,6 +69,7 @@ func (s *State) init() {
 	if s.pos == nil {
 		s.pos, s.info = make(map[string]feeds.Position), make(map[string]events.Aircraft)
 		s.today, s.flights = make(map[string]struct{}), make(map[string]*flight)
+		s.arrivals, s.departures = make(map[string]struct{}), make(map[string]struct{})
 	}
 }
 
@@ -78,6 +87,7 @@ func (s *State) Update(e events.Position) {
 	day := e.At.Local().Format(time.DateOnly)
 	if day > s.day {
 		s.day, s.today = day, make(map[string]struct{})
+		s.arrivals, s.departures = make(map[string]struct{}), make(map[string]struct{})
 	}
 	if day == s.day {
 		s.today[e.Hex] = struct{}{}
@@ -121,7 +131,7 @@ func (s *State) track(p feeds.Position) {
 	if p.TypeCode != "" || (ok && info.TypeCode != "") {
 		f.hasType = true
 	}
-	if ok && info.Route != nil && info.Route.Callsign == p.Callsign {
+	if ok && info.Route != nil && info.Route.Callsign == p.Callsign && plausible(p, info.Route) {
 		f.hasRoute = true
 	}
 }
@@ -144,6 +154,11 @@ type Plane struct {
 	InView       bool    `json:"in_view"`
 	Coming       *Coming `json:"coming,omitempty"`
 	Motion       *Motion `json:"motion,omitempty"`
+	// Airport says what the plane is doing at the followed airport; Near, that it is very close to the window.
+	// Focus marks the planes a focused screen shows: those two, less the ones standing still on the ground.
+	Airport *AtAirport `json:"airport,omitempty"`
+	Near    bool       `json:"near,omitempty"`
+	Focus   bool       `json:"focus,omitempty"`
 }
 
 // SpecialTypes are airframes rare almost anywhere, by ICAO type designator. Rarity at home (what is unusual over this
@@ -197,6 +212,11 @@ type View struct {
 	Sources []string `json:"sources"`
 	// Facts are sentences about the history (overhead-stats) for the screen to show between planes.
 	Facts []string `json:"facts"`
+	// Focused says the screen shows only the planes marked Focus: those at the followed airport (Airport) and those
+	// very close to the window (within NearKm).
+	Focused bool         `json:"focused,omitempty"`
+	NearKm  float64      `json:"near_km,omitempty"`
+	Airport *AirportView `json:"airport,omitempty"`
 }
 
 // LatLon is a point in the JSON the screen reads.
@@ -222,7 +242,9 @@ func (s *State) View(now time.Time) View {
 	v := View{
 		At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Window: w,
 		Planes: []Plane{}, Sources: []string{}, Facts: append([]string{}, s.facts...),
+		Focused: s.Airport != nil || s.NearKm > 0, NearKm: s.NearKm,
 	}
+	today := now.Local().Format(time.DateOnly) == s.day
 	sources := make(map[string]bool)
 	for hex, p := range s.pos {
 		if now.Sub(p.At) > maxAge {
@@ -238,13 +260,26 @@ func (s *State) View(now time.Time) View {
 			BearingDeg: geo.BearingDeg(s.Center, p.Point()),
 			Notable:    notable(p),
 		}
+		var route *events.Route
 		if info, ok := s.info[hex]; ok {
 			if info.Route != nil && info.Route.Callsign != p.Callsign {
 				info.Route = nil // a route looked up for an earlier flight of this airframe
 			}
+			if info.Route != nil && !plausible(p, info.Route) {
+				info.Route = nil // an old leg of a reused flight number
+			}
 			pl.Info = &info
 			pl.ToDestinationKm, pl.ETAMin = eta(p, info.Route)
+			route = info.Route
 		}
+		if s.Airport != nil {
+			if at := s.Airport.classify(p, route); at != nil {
+				pl.Airport = at
+				s.noteAirport(p, at, now, today)
+			}
+		}
+		pl.Near = near(p, s.Center, w.HomeElevationM, s.NearKm)
+		pl.Focus = pl.Near || (pl.Airport != nil && pl.Airport.Phase != "gate" && pl.Airport.Phase != "arrived")
 		// Placed where it should be now, not where it was last reported: the report may be several seconds old.
 		age := reportAge(p, now)
 		if pt, h, ok := project(p, age); ok {
@@ -273,11 +308,37 @@ func (s *State) View(now time.Time) View {
 		v.Sources = append(v.Sources, src)
 	}
 	slices.Sort(v.Sources)
-	if now.Local().Format(time.DateOnly) == s.day {
+	if today {
 		v.Today = len(s.today)
+	}
+	if a := s.Airport; a != nil {
+		v.Airport = &AirportView{ICAO: a.ICAO, IATA: a.IATA, Name: a.Name, Lat: a.Lat, Lon: a.Lon, ElevationFt: a.ElevationFt}
+		if s.runway != "" && now.Sub(s.runwayAt) <= runwayFresh {
+			v.Airport.RunwayInUse = s.runway
+		}
+		if today {
+			v.Airport.ArrivalsToday, v.Airport.DeparturesToday = len(s.arrivals), len(s.departures)
+		}
 	}
 	s.trackPredictions(v)
 	return v
+}
+
+// noteAirport keeps the runway in use and the day's arrivals and departures. Caller holds s.mu.
+func (s *State) noteAirport(p feeds.Position, at *AtAirport, now time.Time, today bool) {
+	if at.Runway != "" && !p.At.Before(s.runwayAt) {
+		s.runway, s.runwayAt = at.Runway, p.At
+	}
+	if !today {
+		return
+	}
+	key := p.Hex + "/" + p.Callsign
+	switch arr, dep := counted(at); {
+	case arr:
+		s.arrivals[key] = struct{}{}
+	case dep:
+		s.departures[key] = struct{}{}
+	}
 }
 
 // How long the state remembers an aircraft's enrichment after it leaves, and a flight for the coverage tally.
@@ -306,6 +367,25 @@ func (s *State) prune(now time.Time) {
 			delete(s.flights, key)
 		}
 	}
+}
+
+// A route is implausible when the plane is far off any reasonable way between its ends. adsbdb's routes are
+// crowd-sourced, and a flight number flown on a new leg can keep its old one: on 2026-10-30, UAL397 "Newark to
+// Orlando" and RPA5603 "Boston to LaGuardia" were both over Lake Ontario. Airways, weather and holding stay well
+// inside the slack.
+const (
+	routeSlack   = 1.25  // origin → plane → destination may be this much longer than origin → destination
+	routeSlackKm = 150.0 // and this much more, for short hops and planes still near either end
+)
+
+func plausible(p feeds.Position, r *events.Route) bool {
+	o := geo.Point{Lat: r.Origin.Lat, Lon: r.Origin.Lon}
+	d := geo.Point{Lat: r.Destination.Lat, Lon: r.Destination.Lon}
+	if o == (geo.Point{}) || d == (geo.Point{}) || !o.Valid() || !d.Valid() {
+		return true // nothing to check it against
+	}
+	here := p.Point()
+	return geo.DistanceKm(o, here)+geo.DistanceKm(here, d) <= routeSlack*geo.DistanceKm(o, d)+routeSlackKm
 }
 
 func eta(p feeds.Position, r *events.Route) (*float64, *float64) {

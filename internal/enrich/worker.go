@@ -152,6 +152,7 @@ func (w *Worker) Enrich(ctx context.Context, job events.EnrichJob) (events.Aircr
 		out.Hex, out.Looked = job.Hex, looked
 	}
 	if routeFound {
+		route = corrected(route) // here rather than at lookup, so routes cached before a fix are corrected too
 		out.Route = &route
 	}
 	if photoFound {
