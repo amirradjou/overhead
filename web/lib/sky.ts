@@ -48,20 +48,29 @@ export function seeded(seed: number): () => number {
 export function rooftops(seed = 7): string {
   const rand = seeded(seed);
   const top = roofline * 1000;
+  // One closed outline, left to right along the roofs: a chimney is a detour up and down within it, never a new
+  // sub-path, or the fill breaks apart.
+  const pts: [number, number][] = [
+    [0, 1000],
+    [0, top + 40],
+  ];
   let x = 0;
-  let d = `M0 1000 L0 ${top + 40}`;
   while (x < 1000) {
     const width = 25 + rand() * 70;
     const drop = rand() < 0.25 ? rand() * 70 : rand() * 18; // most buildings near the line, a few lower ones
     const y = top + drop;
-    d += ` L${x.toFixed(1)} ${y.toFixed(1)} L${Math.min(1000, x + width).toFixed(1)} ${y.toFixed(1)}`;
+    const x2 = Math.min(1000, x + width);
+    pts.push([x, y]);
     if (rand() < 0.15) {
       const cx = x + width * (0.2 + rand() * 0.5); // a chimney or a mast
-      d += ` M${cx.toFixed(1)} ${y.toFixed(1)} L${cx.toFixed(1)} ${(y - 6 - rand() * 10).toFixed(1)} L${(cx + 4).toFixed(1)} ${(y - 6).toFixed(1)} L${(cx + 4).toFixed(1)} ${y.toFixed(1)} M${Math.min(1000, x + width).toFixed(1)} ${y.toFixed(1)}`;
+      const h = 6 + rand() * 10;
+      pts.push([cx, y], [cx, y - h], [cx + 4, y - h], [cx + 4, y]);
     }
-    x += width;
+    pts.push([x2, y]);
+    x = x2;
   }
-  return `${d} L1000 1000 Z`;
+  pts.push([1000, 1000]);
+  return "M" + pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" L") + " Z";
 }
 
 /** Stars for a night sky: positions above the roofline and a brightness each. */

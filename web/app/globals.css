@@ -195,6 +195,9 @@ figure {
 .cue-left {
   transform: translate(0, -50%);
 }
+.cue-text {
+  white-space: nowrap;
+}
 .cue-right {
   flex-direction: row-reverse;
   transform: translate(-100%, -50%);

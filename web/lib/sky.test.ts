@@ -29,8 +29,12 @@ describe("the window on screen", () => {
 
   it("draws the same rooftops and stars every time, never above the roofline", () => {
     expect(rooftops()).toBe(rooftops());
-    const tops = [...rooftops().matchAll(/L[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
+    const path = rooftops();
+    const tops = [...path.matchAll(/[\d.]+,([\d.]+)/g)].map((m) => Number(m[1]));
     expect(Math.min(...tops)).toBeGreaterThanOrEqual(roofline * 1000 - 16); // chimneys poke up a little
+    // One outline: a single move, closed at the end, so the fill can't come apart.
+    expect(path.match(/M/g)).toHaveLength(1);
+    expect(path.endsWith("Z")).toBe(true);
     const s = stars(50);
     expect(s).toEqual(stars(50));
     expect(s.every((st) => st.y < roofline)).toBe(true);
