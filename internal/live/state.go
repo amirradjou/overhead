@@ -48,6 +48,7 @@ type State struct {
 	received uint64
 	pruned   time.Time
 
+	weather              *Weather
 	runway               string // the runway the latest take-off or landing at Airport used
 	runwayAt             time.Time
 	arrivals, departures map[string]struct{} // flights that landed at or took off from Airport today
@@ -217,6 +218,8 @@ type View struct {
 	Focused bool         `json:"focused,omitempty"`
 	NearKm  float64      `json:"near_km,omitempty"`
 	Airport *AirportView `json:"airport,omitempty"`
+	// Weather is the weather at home, when a reading younger than weatherStale is held.
+	Weather *Weather `json:"weather,omitempty"`
 }
 
 // LatLon is a point in the JSON the screen reads.
@@ -310,6 +313,10 @@ func (s *State) View(now time.Time) View {
 	slices.Sort(v.Sources)
 	if today {
 		v.Today = len(s.today)
+	}
+	if s.weather != nil && now.Sub(s.weather.At) <= weatherStale {
+		w := *s.weather
+		v.Weather = &w
 	}
 	if a := s.Airport; a != nil {
 		v.Airport = &AirportView{ICAO: a.ICAO, IATA: a.IATA, Name: a.Name, Lat: a.Lat, Lon: a.Lon, ElevationFt: a.ElevationFt}

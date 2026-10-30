@@ -172,7 +172,7 @@ func addWindowFlags(fs *flag.FlagSet) (*live.Window, error) {
 }
 
 func checkWindow(cmd string, w live.Window) error {
-	// A window high up sees down past the horizon (the 48th floor sees the island airport at -6°), but not past -45°.
+	// A window high up sees down past the horizon (a high floor by the harbour sees the island airport about 6° down), but not past -45°.
 	if w.FOVDeg <= 0 || w.FOVDeg > 360 || w.MinElevationDeg < -45 || w.MinElevationDeg >= 90 {
 		return usageError{"overhead " + cmd + ": -window-fov must be 1 to 360 and -window-min-el -45 to 90"}
 	}

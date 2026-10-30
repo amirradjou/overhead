@@ -93,7 +93,7 @@ func TestClassifyTimes(t *testing.T) {
 }
 
 func TestNear(t *testing.T) {
-	home := geo.Point{Lat: 43.6397, Lon: -79.3921}
+	home := geo.Point{Lat: 43.6426, Lon: -79.3871}
 	heli := func(km, altFt float64) feeds.Position {
 		pt := geo.Destination(home, 180, km)
 		alt := int(altFt)
@@ -117,7 +117,7 @@ func TestNear(t *testing.T) {
 
 func TestViewFollowsTheAirport(t *testing.T) {
 	a := ytz
-	s := &State{Center: geo.Point{Lat: 43.6397, Lon: -79.3921}, RadiusKm: 60, Airport: &a, NearKm: 3,
+	s := &State{Center: geo.Point{Lat: 43.6426, Lon: -79.3871}, RadiusKm: 60, Airport: &a, NearKm: 3,
 		Window: Window{AzimuthDeg: 163, FOVDeg: 100, MinElevationDeg: -10, MaxElevationDeg: 30, HomeElevationM: 218}}
 	pos := func(hex string, p feeds.Position) events.Position {
 		p.Hex, p.At, p.Source = hex, t0, "adsb.fi"
