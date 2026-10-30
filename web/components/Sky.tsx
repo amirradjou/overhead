@@ -240,7 +240,7 @@ function Cue({ plane, w }: { plane: Plane; w: Window }) {
       ? `${(roofline - 0.04) * 100}%`
       : c.side === "above"
         ? "calc(var(--safe-y) + 1rem)"
-        : `max(calc(var(--safe-y) + 1rem), ${at.y * 100}%)`;
+        : `${Math.max(0.1, at.y) * 100}%`; // below the safe top margin; CSS max() needs Chromium 79
   return (
     <div className={`cue cue-${c.side}`} style={{ left, top }}>
       <span className="cue-mark" />

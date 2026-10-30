@@ -80,13 +80,13 @@ a {
   height: 100%;
 }
 
-/* The light round the sun: a wide soft ellipse, centred where the sun is, even beside or below the window. */
+/* The light round the sun: a wide soft ellipse, centred where the sun is, even beside or below the window. It changes
+   in steps too small to see every 20 s; no transition, so no screen-sized layer animates all day. */
 .sun-glow {
   position: absolute;
   width: 110vw;
   height: 70vh;
   transform: translate(-50%, -50%);
-  transition: opacity 20s linear;
 }
 
 .moon {
