@@ -4,7 +4,7 @@ The planes you can see from your window, live: a calm, screensaver-like view of 
 screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
 community flight-tracking feeds.
 
-> **Status: M0 (poller + terminal table) built.** This README is the spec. The milestones at the end track what is
+> **Status: M0 (poller + terminal table) and M1 (event pipeline + enrichment) built.** This README is the spec. The milestones at the end track what is
 > built.
 
 ## What it is
@@ -122,7 +122,7 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 | | Milestone | Done when |
 |---|---|---|
 | M0 ✅ | Poller + terminal table of planes within 30 km, two feeds merged | a one-hour run with no gap over 30 s and no duplicate aircraft — **720 polls, longest gap 5 s, no duplicates, see [M0 results](#m0-results)** |
-| M1 | Event pipeline (RabbitMQ) and enrichment with caching | at least 90% of commercial flights shown with type and route; under 5 API calls per new plane; stopping any consumer for 10 minutes loses no positions |
+| M1 ✅ | Event pipeline (RabbitMQ) and enrichment with caching | at least 90% of commercial flights shown with type and route; under 5 API calls per new plane; stopping any consumer for 10 minutes loses no positions — **92% (24 of 26), 2.26 calls per new plane, 8,014 of 8,014 positions stored after a 10-minute outage, see [M1 results](#m1-results)** |
 | M2 | Window view v1: the sky through your window, the plane in view and the next one coming, over SSE | runs a full day in the TV browser without a reload; on one evening, 20 planes seen from the window appear on screen on the right side, and "coming next" is right to within a minute |
 | M3 | History: S3 → Snowpipe → Snowflake, flights stitched | a week of data; Snowflake row counts reconcile with the poller's own counts |
 | M4 | Stats + notebooks; a fact between planes on the screen | the facts shown match the notebook numbers |
@@ -145,3 +145,18 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 
 Before adsb.lol was spaced to 15 s, asking it every 5 s drew HTTP 429 after about three and a half minutes; the
 poller backed off and adsb.fi carried the picture with no gap.
+
+## M1 results
+
+The whole pipeline (poll, enrich, history, live) ran round Toronto Pearson on 2026-10-29 from 23:30 to 00:47 EDT
+(commit 26d1d42 plus the fixes up to ce3b884; the later fixes in this milestone were not in that binary).
+
+| | |
+|---|---|
+| Outage | history and enrich stopped from 23:34 to 23:45 (just over ten minutes) while the poller kept publishing; live restarted at 23:47 |
+| Positions | 8,014 published, none lost by the poller; `overhead verify`: all 8,014 stored, none missing, none duplicated |
+| Durable queues | the alerts queue (no consumer yet) held all 8,014; history and enrich drained to zero after the restart |
+| Coverage | of the 26 airline flights a minute or more airborne in view after live's restart, 24 had type and route on screen (92%); the two without, CPA075 and PTR2161, have no route in adsbdb |
+| API calls | 131 calls for 58 new aircraft across both enrich runs: 2.26 per new plane (cache hits: 239) |
+| Dead letters | 5 jobs, all with the callsign "@@@@@@@@" that readsb prints when it cannot decode one; adsbdb answered 400. Such callsigns are now dropped at the feed (7e03ff2) |
+| Poller | 921 polls, longest gap 5 s |
