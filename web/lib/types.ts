@@ -94,4 +94,6 @@ export interface View {
   planes: Plane[];
   today: number;
   sources: string[];
+  /** Sentences about the history, for between planes. */
+  facts: string[];
 }

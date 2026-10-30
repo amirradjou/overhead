@@ -18,13 +18,19 @@ interface Props {
   alsoInView: number;
   next?: Plane;
   today?: number;
+  facts: string[];
+  now: Date | null;
   status: Status;
 }
 
 const trendWord = { climbing: "climbing", descending: "descending", level: "" } as const;
 
-// The words over the rooftops: the plane in view, or what comes next, and one line of the day's tally.
-export default function Caption({ plane, alsoInView, next, today, status }: Props) {
+// A fact stays up this long before the next takes its place.
+const factEvery = 20_000;
+
+// The words over the rooftops: the plane in view, or what comes next; between planes, a fact about the history.
+export default function Caption({ plane, alsoInView, next, today, facts, now, status }: Props) {
+  const fact = facts.length && now ? facts[Math.floor(now.getTime() / factEvery) % facts.length] : undefined;
   return (
     <section className="caption" aria-live="polite">
       {/* Keyed on the plane, so a new one fades in rather than overwriting the old one mid-sentence. */}
@@ -32,16 +38,22 @@ export default function Caption({ plane, alsoInView, next, today, status }: Prop
         {plane ? <InView plane={plane} /> : <Waiting next={next} status={status} />}
       </div>
       <p className="caption-foot">
-        {plane && alsoInView > 0 && (
-          <span>{alsoInView === 1 ? "One more" : `${alsoInView} more`} in view. </span>
-        )}
-        {plane && next && (
-          <span>
-            Next, {flightName(next)} {arrival(next)}.{" "}
+        {plane ? (
+          <>
+            {alsoInView > 0 && <span>{alsoInView === 1 ? "One more" : `${alsoInView} more`} in view. </span>}
+            {next && (
+              <span>
+                Next, {flightName(next)} {arrival(next)}.
+              </span>
+            )}
+          </>
+        ) : fact ? (
+          <span key={fact} className="fact">
+            {fact}
           </span>
-        )}
-        {today !== undefined && today > 0 && (
-          <span>{today === 1 ? "One aircraft" : `${today} aircraft`} passed by today.</span>
+        ) : (
+          today !== undefined &&
+          today > 0 && <span>{today === 1 ? "One aircraft" : `${today} aircraft`} passed by today.</span>
         )}
       </p>
     </section>

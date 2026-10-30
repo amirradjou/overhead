@@ -379,6 +379,11 @@ figure {
   font-size: 0.58rem;
   color: var(--text-faint);
 }
+.fact {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  animation: fade-in 1.2s ease-out both;
+}
 
 .credits {
   position: absolute;
@@ -400,7 +405,8 @@ figure {
 @media (prefers-reduced-motion: reduce) {
   .strobe,
   .cue,
-  .caption-body {
+  .caption-body,
+  .fact {
     animation: none;
   }
 }

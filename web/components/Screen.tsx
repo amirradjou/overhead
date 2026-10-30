@@ -40,6 +40,8 @@ export default function Screen() {
           alsoInView={visible.length - 1}
           next={next}
           today={view?.today}
+          facts={view?.facts ?? []}
+          now={now}
           status={status}
         />
         <p className="credits">

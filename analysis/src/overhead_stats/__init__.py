@@ -66,7 +66,11 @@ def _literal(s: str) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
+def passes_sql() -> str:
+    """The pass-stitching query (passes.sql); it reads the positions view that connect makes."""
+    return resources.files(__package__).joinpath("passes.sql").read_text()
+
+
 def passes(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    """One row per pass round home (see passes.sql)."""
-    sql = resources.files(__package__).joinpath("passes.sql").read_text()
-    return con.sql(sql).df()
+    """One row per pass round home."""
+    return con.sql(passes_sql()).df()
