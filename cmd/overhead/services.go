@@ -151,6 +151,8 @@ func runLive(ctx context.Context, args []string) error {
 	public := fs.Bool("public", false, "commercial flights only (the README privacy rule for the public demo)")
 	airport := fs.String("airport", env("OVERHEAD_AIRPORT", ""),
 		"follow this airport (ICAO: "+strings.Join(slices.Sorted(maps.Keys(live.Airports)), ", ")+"): its take-offs and landings only, with more about each (OVERHEAD_AIRPORT)")
+	weather := fs.Bool("weather", env("OVERHEAD_WEATHER", "on") != "off",
+		"fetch the weather at home from open-meteo.com every 10 min, for the clouds and the wind (OVERHEAD_WEATHER=off)")
 	nearKm, err := envFloat("OVERHEAD_NEAR_KM", 0)
 	if err != nil {
 		return usageError{err.Error()}
@@ -204,6 +206,11 @@ func runLive(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	wg.Go(func() { srv.Run(ctx) })
 	wg.Go(func() { live.WatchFacts(ctx, *factsPath, state, 30*time.Second) })
+	if *weather {
+		wc := &live.WeatherClient{Base: "https://api.open-meteo.com", HTTP: &http.Client{Timeout: 20 * time.Second},
+			UserAgent: userAgent()}
+		wg.Go(func() { live.WatchWeather(ctx, wc, state, 10*time.Minute) })
+	}
 	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-live", bus.QueueLive, 500, consumer.Positions) })
 	wg.Go(func() {
 		_ = bus.Consume(ctx, amqpURL(), "overhead-live-aircraft", bus.QueueLiveAircraft, 100, consumer.Aircraft)

@@ -6,6 +6,7 @@ import Caption from "./Caption";
 import Overview from "./Overview";
 import Sky from "./Sky";
 import { board, shown } from "@/lib/airport";
+import { sceneryFor } from "@/lib/scenery";
 import { sourceHomes } from "@/lib/format";
 import { comingNext, inView } from "@/lib/pick";
 import { skyColours } from "@/lib/skyColour";
@@ -36,6 +37,8 @@ export default function Screen() {
   const visible = inView(planes);
   const next = comingNext(planes)[0];
   const sources = view?.sources ?? [];
+  // The harbour drawn from OpenStreetMap is credited as its licence asks.
+  const mapped = !!view && !!sceneryFor(view.center, view.window);
 
   return (
     <main
@@ -66,6 +69,7 @@ export default function Screen() {
             status={status}
             home={view ? { lat: view.center.lat, lon: view.center.lon, window: view.window } : undefined}
             airport={view?.airport}
+            weather={view?.weather}
           />
           <p className="credits">
             <span>
@@ -85,6 +89,16 @@ export default function Screen() {
             <span>
               Photos from <Site name="planespotters.net" />
             </span>
+            {view?.weather && (
+              <span>
+                Weather from <Site name="open-meteo.com" />
+              </span>
+            )}
+            {mapped && (
+              <span>
+                Map © <Site name="OpenStreetMap" /> contributors
+              </span>
+            )}
           </p>
         </div>
       </div>

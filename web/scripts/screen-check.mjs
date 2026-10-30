@@ -46,6 +46,8 @@ const scenes = [
   { name: "twilight", at: "2026-10-30T22:25:00Z", traffic: "empty" },
   // A high window following Billy Bishop: a landing below the horizon, a departure, a helicopter close by.
   { name: "island", at: "2026-10-30T17:00:00Z", traffic: "island" },
+  { name: "islanddusk", at: "2026-10-30T21:50:00Z", traffic: "island" },
+  { name: "islandnight", at: "2026-10-30T02:30:00Z", traffic: "island" },
 ];
 
 const airports = {
@@ -60,7 +62,8 @@ const airports = {
   YTZ: { icao: "CYTZ", iata: "YTZ", city: "Toronto", lat: 43.6275, lon: -79.3962 },
 };
 
-// The island scene's window: the 48th floor, facing south-south-east, seeing down to the island airport.
+// The island scene's window: high over the harbour, facing south-south-east, seeing down to the island airport.
+// Its home is the CN Tower's foot, a public place standing in for any window by the harbour.
 const highWindow = {
   azimuth_deg: 163,
   fov_deg: 100,
@@ -98,12 +101,26 @@ function islandSnapshot(t) {
   const dash8 = { type: "DH8D", typeName: "DHC-8-402 Dash 8", maker: "De Havilland Canada" };
   return {
     at: new Date().toISOString(),
-    center: { lat: 43.6397, lon: -79.3921 },
+    center: { lat: 43.6426, lon: -79.3871 },
     radius_km: 60,
     window: highWindow,
     focused: true,
     near_km: 3,
     airport: ytz,
+    // Partly cloudy with a west-north-west wind, as on the afternoon the photos from the window were taken.
+    weather: {
+      at: new Date().toISOString(),
+      temp_c: 12.4,
+      code: 2,
+      cloud_cover: 55,
+      cloud_low: 45,
+      cloud_mid: 15,
+      cloud_high: 30,
+      visibility_m: 30000,
+      wind_kmh: 18,
+      wind_from_deg: 300,
+      gust_kmh: 29,
+    },
     planes: [
       islandPlane(
         t,
@@ -618,7 +635,7 @@ async function check(chrome) {
         problems.push(`${report.crafts} planes on screen, want ${wantCrafts}`);
       if (layouts > 12) problems.push(`${layouts} layouts in 6 s: something animates layout`); // a few per snapshot
       console.log(
-        `${problems.length ? "FAIL" : "ok  "} ${scene.name.padEnd(9)} ${file}  layouts/6s=${layouts} smallest text=${report.smallestText}px`,
+        `${problems.length ? "FAIL" : "ok  "} ${scene.name.padEnd(11)} ${file}  layouts/6s=${layouts} smallest text=${report.smallestText}px`,
       );
       for (const p of problems) console.log(`       ${p}`);
       failures.push(...problems.map((p) => `${scene.name}: ${p}`));

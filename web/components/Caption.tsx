@@ -9,6 +9,7 @@ import {
   lookWhere,
   vertical,
 } from "@/lib/airport";
+import { cloudLine, weatherLine } from "@/lib/weather";
 import { moonLine, sunLine } from "@/lib/almanac";
 import {
   aircraftType,
@@ -25,7 +26,7 @@ import {
 import { rotating } from "@/lib/pick";
 import { flightProgress, progressText } from "@/lib/progress";
 import type { Status } from "@/lib/useLiveView";
-import type { FollowedAirport, Plane, Window } from "@/lib/types";
+import type { FollowedAirport, Plane, Weather, Window } from "@/lib/types";
 
 interface Props {
   plane?: Plane;
@@ -37,6 +38,7 @@ interface Props {
   home?: { lat: number; lon: number; window: Window };
   /** The airport the screen follows, if any: its flights get the full story. */
   airport?: FollowedAirport;
+  weather?: Weather;
 }
 
 // A line in the quiet place under the caption stays up this long before the next takes its place.
@@ -45,12 +47,24 @@ const lineEvery = 20_000;
 // The words over the rooftops: the plane in view, or what comes next. Under them, one quiet line at a time: while a
 // plane is in view, what comes next and a fact about the aircraft; between planes, a fact about the history, the
 // next sunrise or sunset and the moon.
-export default function Caption({ plane, alsoInView, next, facts, now, status, home, airport }: Props) {
+export default function Caption({
+  plane,
+  alsoInView,
+  next,
+  facts,
+  now,
+  status,
+  home,
+  airport,
+  weather,
+}: Props) {
   const skyLines = useSkyLines(home, now);
   const day = airport ? airportDay(airport) : "";
+  // The weather, and the wind that decides the runway, between planes.
+  const sky = weather ? [weatherLine(weather, airport), cloudLine(weather)] : [];
   const lines = plane
     ? [following(alsoInView, next, home?.window), ...typeFactLines(plane), day].filter(Boolean)
-    : [day, ...facts, ...skyLines].filter(Boolean);
+    : [day, ...sky, ...facts, ...skyLines].filter(Boolean);
   const full = plane && home && (plane.airport || plane.near);
   const line = rotating(lines, now, lineEvery);
   return (

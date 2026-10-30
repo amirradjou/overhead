@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Clouds from "./Clouds";
+import Scenery from "./Scenery";
 import { shown } from "@/lib/airport";
 import { label } from "@/lib/format";
 import {
@@ -17,6 +19,7 @@ import {
   screenTop,
 } from "@/lib/sky";
 import { sunGlow } from "@/lib/skyColour";
+import { projector, sceneryFor } from "@/lib/scenery";
 import { magnitudeLimit, starColour, starsAbove } from "@/lib/stars";
 import { moonAt, moonPath, type SkyPhase } from "@/lib/sun";
 import type { Plane, View, Window } from "@/lib/types";
@@ -44,9 +47,16 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
   );
   const high = w ? looksDown(w) : false;
   const roofs = useMemo(() => (high ? sill() : rooftops()), [high]);
-  const horizon = w ? horizonY(w) : undefined;
   const lat = view?.center.lat;
   const lon = view?.center.lon;
+  // From high over Toronto's harbour, the view below the horizon is drawn from the map; elsewhere, a plain band.
+  const home = useMemo(() => (lat === undefined || lon === undefined ? undefined : { lat, lon }), [lat, lon]);
+  const scenery = useMemo(() => (home && w ? sceneryFor(home, w) : null), [home, w]);
+  const horizon = useMemo(
+    () => (scenery && home && w ? projector(home, w, scenery.lake_m).horizonY : w ? horizonY(w) : undefined),
+    [scenery, home, w],
+  );
+  const weather = view?.weather;
   const visible = useMemo(() => shown(view).filter((p) => p.in_view), [view]);
   const trails = useTrails(visible, w);
   const size = useScreenSize();
@@ -64,8 +74,36 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
     const moon = m.alt > 0 && inFrame(w, moonOff, m.alt) ? { ...m, ...toScreen(w, moonOff, m.alt) } : null;
     const sunOff = offsetFrom(w, sun.az);
     const sunY = sun.alt > w.min_elevation_deg ? toScreen(w, sunOff, sun.alt).y : roofline;
-    return { stars, moon, glow: sunGlow(sun.alt, sunOff, w.fov_deg, sunY), limit: magnitudeLimit(sun.alt) };
-  }, [w, now, lat, lon, sun]);
+    // A path of light on the water under the sun, or under a bright moon at night, when either is low and ahead.
+    const clear = 1 - Math.min(1, (weather?.cloud_low ?? 0) / 100) * 0.9;
+    let glitter = null;
+    if (sun.alt > -1 && sun.alt < 35 && Math.abs(sunOff) < w.fov_deg / 2 + 5) {
+      glitter = {
+        offsetDeg: sunOff,
+        alt: sun.alt,
+        moon: false,
+        strength: (sun.alt < 15 ? 0.6 : 0.35) * clear,
+      };
+    } else if (
+      sun.alt < -8 &&
+      m.alt > 0 &&
+      m.alt < 40 &&
+      m.fraction > 0.3 &&
+      Math.abs(moonOff) < w.fov_deg / 2
+    ) {
+      glitter = { offsetDeg: moonOff, alt: m.alt, moon: true, strength: 0.45 * m.fraction * clear };
+    }
+    return {
+      stars,
+      moon,
+      glow: sunGlow(sun.alt, sunOff, w.fov_deg, sunY),
+      sunOffset: sunOff,
+      limit: magnitudeLimit(sun.alt),
+      glitter: glitter && glitter.strength > 0.05 ? glitter : null,
+    };
+  }, [w, now, lat, lon, sun, weather?.cloud_low]);
+  // The horizon hazes over as the air thickens: a little always, as in any photo across the lake.
+  const haze = weather ? Math.min(0.75, Math.max(0.2, 0.25 + (1 - weather.visibility_m / 30000) * 0.5)) : 0.3;
   const scale = size ? size.height / 1080 : 1;
 
   return (
@@ -97,8 +135,23 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
         </svg>
       )}
       {heavens?.moon && <MoonDisc moon={heavens.moon} dark={dark} />}
+      {w && weather && sun && (
+        <Clouds weather={weather} w={w} sunAlt={sun.alt} horizonY={horizon ?? roofline} />
+      )}
       {/* Below the horizon, under the planes: from high up they are seen against the water or the city. */}
-      {horizon !== undefined && <div className="below-horizon" style={{ top: `${horizon * 100}%` }} />}
+      {scenery && home && w && sun ? (
+        <Scenery
+          scenery={scenery}
+          home={home}
+          w={w}
+          sunAlt={sun.alt}
+          glitter={heavens?.glitter ?? null}
+          sunOffset={heavens?.sunOffset ?? 0}
+          haze={haze}
+        />
+      ) : (
+        horizon !== undefined && <div className="below-horizon" style={{ top: `${horizon * 100}%` }} />
+      )}
       {w && (
         <svg className="trails" viewBox="0 0 1000 1000" preserveAspectRatio="none">
           {/* Up to where the plane was at the last snapshot: it glides on from there, so the trail follows it. */}
@@ -121,9 +174,11 @@ export default function Sky({ view, now, phase, sun, featuredHex, next }: Props)
           <Craft key={p.hex} plane={p} w={w} size={size} dark={dark} featured={p.hex === featuredHex} />
         ))}
       {w && next?.coming && <Cue plane={next} w={w} />}
-      <svg className="roofs" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-        <path d={roofs} />
-      </svg>
+      {!scenery && (
+        <svg className="roofs" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+          <path d={roofs} />
+        </svg>
+      )}
       {w && (
         // Compass points stand on the horizon: the roofline, or from high up the line where sky meets water.
         <div

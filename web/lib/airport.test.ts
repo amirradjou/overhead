@@ -178,6 +178,6 @@ describe("following an airport", () => {
   });
 
   it("finds the airport's direction from home", () => {
-    expect(bearingDeg({ lat: 43.6397, lon: -79.3921 }, ytz)).toBeCloseTo(193.5, 0);
+    expect(bearingDeg({ lat: 43.6426, lon: -79.3871 }, ytz)).toBeCloseTo(203.6, 0);
   });
 });

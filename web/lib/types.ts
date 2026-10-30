@@ -75,6 +75,24 @@ export interface FollowedAirport {
   departures_today: number;
 }
 
+/** The weather at home (Open-Meteo), when the live API has a fresh reading. */
+export interface Weather {
+  at: string;
+  temp_c: number;
+  /** WMO weather code. */
+  code: number;
+  /** Cloud cover in percent: all, low, mid and high. */
+  cloud_cover: number;
+  cloud_low: number;
+  cloud_mid: number;
+  cloud_high: number;
+  visibility_m: number;
+  wind_kmh: number;
+  /** Where the wind blows from, degrees clockwise from north. */
+  wind_from_deg: number;
+  gust_kmh: number;
+}
+
 /** When and where a plane comes into view. */
 export interface Coming {
   in_s: number;
@@ -135,4 +153,5 @@ export interface View {
   focused?: boolean;
   near_km?: number;
   airport?: FollowedAirport;
+  weather?: Weather;
 }
