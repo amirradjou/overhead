@@ -161,6 +161,9 @@ func TestServerNowAndStream(t *testing.T) {
 			snapshots++
 		}
 	}
+	if err := sc.Err(); err != nil && snapshots < 3 {
+		t.Fatalf("reading the stream: %v", err)
+	}
 	if snapshots < 3 {
 		t.Fatalf("got %d snapshots: the first at once, then one per tick", snapshots)
 	}
@@ -191,6 +194,25 @@ func TestPruneForgetsWhatIsLongGone(t *testing.T) {
 	s.View(t0.Add(7*time.Hour + 2*time.Minute))
 	if !s.HasInfo("bbbbbb") {
 		t.Fatal("enrichment for an aircraft still in the picture was dropped")
+	}
+}
+
+func TestNotable(t *testing.T) {
+	tests := []struct {
+		p    feeds.Position
+		want string
+	}{
+		{feeds.Position{Squawk: "7700", Military: true}, "Squawking 7700: emergency"},
+		{feeds.Position{Squawk: "7600"}, "Squawking 7600: radio failure"},
+		{feeds.Position{Emergency: "lifeguard"}, "Declared emergency: lifeguard"},
+		{feeds.Position{TypeCode: "A124", Military: true}, "Rare visitor: Antonov An-124 Ruslan"},
+		{feeds.Position{Military: true, TypeCode: "C17"}, "Military aircraft"},
+		{feeds.Position{TypeCode: "A320", Squawk: "1234"}, ""},
+	}
+	for _, tt := range tests {
+		if got := notable(tt.p); got != tt.want {
+			t.Errorf("notable(%+v) = %q, want %q", tt.p, got, tt.want)
+		}
 	}
 }
 
