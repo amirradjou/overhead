@@ -72,7 +72,9 @@ func (w *Writer) Session(ctx context.Context, ch *amqp.Channel, deliveries <-cha
 			retry = nil
 		}
 		for _, bt := range closed {
-			if err := w.store(ctx, ch, bt); err != nil {
+			err := w.store(ctx, ch, bt)
+			b.Touch(w.now())
+			if err != nil {
 				if ctx.Err() != nil {
 					return nil
 				}
@@ -94,7 +96,9 @@ func (w *Writer) store(ctx context.Context, ch *amqp.Channel, bt *Batch) error {
 	}
 	for _, tag := range bt.Tags {
 		if err := ch.Ack(tag, false); err != nil {
-			// The batch is stored; its messages will be redelivered and the same file rewritten.
+			// Acks fail only when the channel has closed, and then every unacknowledged message comes back. If some
+			// of this batch's acks went through, the rest regroup under a later first sequence number and a second
+			// file holds them again: readers count each run and sequence number once (verify reports it).
 			return err
 		}
 	}

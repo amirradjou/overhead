@@ -71,6 +71,20 @@ func TestBatcherDueNeedsGraceAndQuiet(t *testing.T) {
 	}
 }
 
+func TestTouchHoldsTheQuietRule(t *testing.T) {
+	b := &Batcher{Grace: time.Second, Quiet: 3 * time.Second}
+	e, line := ev("r", 1, t0)
+	b.Add(1, e, line, t0.Add(time.Hour))
+	// A slow store just finished: the next tick must not close the batch, its messages may be waiting.
+	b.Touch(t0.Add(time.Hour + 10*time.Second))
+	if due := b.Due(t0.Add(time.Hour + 11*time.Second)); len(due) != 0 {
+		t.Fatal("closed a batch right after a slow store")
+	}
+	if due := b.Due(t0.Add(time.Hour + 14*time.Second)); len(due) != 1 {
+		t.Fatal("not closed once it had been quiet")
+	}
+}
+
 func TestBatcherKeepsRunsApart(t *testing.T) {
 	b := &Batcher{}
 	e1, l1 := ev("old", 900, t0.Add(10*time.Second))

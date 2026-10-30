@@ -41,6 +41,12 @@ func (d DirStore) Put(_ context.Context, key string, body []byte) error {
 		tmp.Close()
 		return err
 	}
+	// On disk before the rename: the batch is acknowledged once Put returns, so a power cut must not leave an empty
+	// file behind an acknowledged batch.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
@@ -130,6 +136,10 @@ func (b *Batcher) Add(tag uint64, ev events.Position, line []byte, now time.Time
 	cur.Tags = append(cur.Tags, tag)
 	return closed
 }
+
+// Touch counts now as activity for the quiet rule. The writer calls it after storing a batch: a store that took
+// longer than Quiet must not let the rule close a batch whose next messages are already waiting.
+func (b *Batcher) Touch(now time.Time) { b.lastAdd = now }
 
 // Due returns the batches the quiet rule closes at now.
 func (b *Batcher) Due(now time.Time) []*Batch {
