@@ -18,6 +18,7 @@ fmt:
 TF := terraform -chdir=terraform
 
 up:
+	@test -n "$$TF_VAR_budget_email" || { echo "set TF_VAR_budget_email: the US\$$5 cost alert goes up first"; exit 1; }
 	$(TF) init -input=false
 	$(TF) apply -input=false -auto-approve
 	$(MAKE) image
