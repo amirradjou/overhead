@@ -20,10 +20,13 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -X github.com/amirradjou/overhead/internal/buildinfo.Version=${VERSION}" \
     -o /overhead ./cmd/overhead
+# The data directory, owned by distroless's nonroot user: a fresh named volume takes its owner from here.
+RUN mkdir -p /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=go /overhead /overhead
 COPY --from=web /src/web/out /web
+COPY --from=go --chown=65532:65532 /out/data /data
 ENV OVERHEAD_DATA=/data
 USER nonroot
 ENTRYPOINT ["/overhead"]

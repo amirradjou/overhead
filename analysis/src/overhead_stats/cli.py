@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--window-az", type=float, default=_env_float("OVERHEAD_WINDOW_AZ", 0))
     p.add_argument("--window-fov", type=float, default=_env_float("OVERHEAD_WINDOW_FOV", 360))
     p.add_argument("--window-min-el", type=float, default=_env_float("OVERHEAD_WINDOW_MIN_EL", 5))
+    p.add_argument("--window-max-el", type=float, default=_env_float("OVERHEAD_WINDOW_MAX_EL", 90))
     p.add_argument("--home-elev", type=float, default=_env_float("OVERHEAD_HOME_ELEV", 0))
     p.add_argument("--out", type=Path, default=data / "facts.json", help="facts: where the live API reads them")
     p.add_argument("--every", type=float, default=0, help="facts: rewrite every this many minutes (0: once)")
@@ -38,15 +39,36 @@ def main(argv: list[str] | None = None) -> int:
         df.to_csv(sys.stdout, index=False)
         return 0
 
-    window = Window(args.window_az, args.window_fov, args.window_min_el, args.home_elev)
+    window = Window(
+        azimuth_deg=args.window_az,
+        fov_deg=args.window_fov,
+        min_elevation_deg=args.window_min_el,
+        max_elevation_deg=args.window_max_el,
+        home_elevation_m=args.home_elev,
+    )
     while True:
         now = datetime.now(UTC)
-        found = facts(connect(args.history, args.lat, args.lon), now, args.tz, window)
-        _write(args.out, {"generated": now.isoformat(), "facts": found})
-        print(f"{now:%H:%M:%S} wrote {len(found)} facts to {args.out}", file=sys.stderr)
+        try:
+            # No history yet (a fresh install) is no facts, not an error.
+            found = (
+                facts(connect(args.history, args.lat, args.lon), now, args.tz, window)
+                if has_history(args.history)
+                else []
+            )
+            _write(args.out, {"generated": now.isoformat(), "facts": found})
+            print(f"{now:%H:%M:%S} wrote {len(found)} facts to {args.out}", file=sys.stderr)
+        except Exception as e:  # one bad run must not stop a job that rewrites every few minutes
+            if args.every <= 0:
+                raise
+            print(f"{now:%H:%M:%S} facts failed, will try again: {e}", file=sys.stderr)
         if args.every <= 0:
             return 0
         time.sleep(args.every * 60)
+
+
+def has_history(history: Path) -> bool:
+    """Whether the history writer has stored any batch yet."""
+    return any(history.glob("positions/*/*/*.jsonl.gz"))
 
 
 def _write(path: Path, doc: dict) -> None:
