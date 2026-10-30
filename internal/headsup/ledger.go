@@ -11,6 +11,8 @@ import (
 type Deduper interface {
 	// First reports whether n is new, and records it.
 	First(n Notice) (bool, error)
+	// Forget undoes First for a notice that could not be sent, so it is tried again.
+	Forget(n Notice) error
 }
 
 // learning is how long a new ledger only records types: at first every type is "new", which says nothing.
@@ -77,6 +79,11 @@ func (l *Ledger) First(n Notice) (bool, error) {
 	return first, err
 }
 
+// Forget removes n's record.
+func (l *Ledger) Forget(n Notice) error {
+	return l.db.Update(func(tx *bolt.Tx) error { return tx.Bucket(bucketSent).Delete([]byte(n.Key())) })
+}
+
 // Known records the type and reports whether it was seen before. During the first week every type counts as known.
 func (l *Ledger) Known(code string) bool {
 	known := true
@@ -109,4 +116,12 @@ func (m *MemLedger) First(n Notice) (bool, error) {
 	}
 	m.sent[n.Key()] = true
 	return true, nil
+}
+
+// Forget removes n's record.
+func (m *MemLedger) Forget(n Notice) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.sent, n.Key())
+	return nil
 }

@@ -139,12 +139,13 @@ func whenText(p live.Plane) string {
 	return fmt.Sprintf("in view in about %d min", m)
 }
 
-// maxElevation is how high in the window's sky the plane is, or will be when it comes into view.
+// maxElevation is how high in the window's sky the plane is, or will be when it comes into view: where it is now
+// says nothing about the window while it is still outside the window's slice of sky.
 func maxElevation(p live.Plane) float64 {
 	if p.InView || p.Coming == nil {
 		return p.ElevationDeg
 	}
-	return math.Max(p.ElevationDeg, p.Coming.ElevationDeg)
+	return p.Coming.ElevationDeg
 }
 
 func orInt(v, fallback int) int {

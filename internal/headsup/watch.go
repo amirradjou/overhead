@@ -24,12 +24,21 @@ type Watcher struct {
 	Ledger Deduper
 	Send   Sender
 	Every  time.Duration
+
+	// retryAt holds back notices whose send failed, so a phone service that is down is not asked every tick.
+	retryAt map[string]time.Time
 }
 
-// Tick checks the picture at now and sends the notices not sent before; it returns those.
+// retryAfter is how long a notice that failed to send waits before it is tried again.
+const retryAfter = time.Minute
+
+// Tick checks the picture at now and sends the notices not sent before; it returns those it sent.
 func (w *Watcher) Tick(ctx context.Context, now time.Time) []Notice {
 	var sent []Notice
 	for _, n := range w.Rules.Check(w.State.View(now)) {
+		if now.Before(w.retryAt[n.Key()]) {
+			continue
+		}
 		first, err := w.Ledger.First(n)
 		if err != nil {
 			slog.Error("heads-up: ledger", "err", err)
@@ -39,8 +48,18 @@ func (w *Watcher) Tick(ctx context.Context, now time.Time) []Notice {
 			continue
 		}
 		if err := w.Send.Send(ctx, n.Text); err != nil {
-			slog.Warn("heads-up: sending failed", "kind", n.Kind, "hex", n.Hex, "err", err)
+			// Not sent, so not recorded: an emergency must not be lost to one timeout. Tried again in a minute.
+			slog.Warn("heads-up: sending failed; will retry", "kind", n.Kind, "hex", n.Hex, "err", err)
+			if err := w.Ledger.Forget(n); err != nil {
+				slog.Error("heads-up: ledger", "err", err)
+			}
+			if w.retryAt == nil {
+				w.retryAt = make(map[string]time.Time)
+			}
+			w.retryAt[n.Key()] = now.Add(retryAfter)
+			continue
 		}
+		delete(w.retryAt, n.Key())
 		sent = append(sent, n)
 	}
 	return sent

@@ -3,6 +3,7 @@ package headsup
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -69,6 +70,57 @@ func TestRules(t *testing.T) {
 	n := Rules{}.Check(live.View{At: t0, Planes: v.Planes[1:2]})[0]
 	if n.Text != "Rare visitor: Antonov An-124 Ruslan (ADB3021) in view in about 2 min." {
 		t.Errorf("text = %q", n.Text)
+	}
+}
+
+type flakySender struct {
+	fail  bool
+	texts []string
+}
+
+func (f *flakySender) Send(_ context.Context, text string) error {
+	if f.fail {
+		return errors.New("telegram: HTTP 502")
+	}
+	f.texts = append(f.texts, text)
+	return nil
+}
+
+func TestFailedSendIsRetriedNotLost(t *testing.T) {
+	state := &live.State{Center: pearson, RadiusKm: 60, Window: south}
+	alt := 6000
+	state.Update(events.Position{Position: feeds.Position{
+		Hex: "e00001", Callsign: "ACA101", Squawk: "7700", Lat: 43.70, Lon: -79.62, AltFt: &alt, At: t0,
+	}})
+	send := &flakySender{fail: true}
+	w := &Watcher{State: state, Ledger: &MemLedger{}, Send: send}
+
+	if got := w.Tick(context.Background(), t0); len(got) != 0 {
+		t.Fatalf("a failed send was reported as sent: %v", kinds(got))
+	}
+	send.fail = false
+	if got := w.Tick(context.Background(), t0.Add(30*time.Second)); len(got) != 0 {
+		t.Fatal("retried before its minute was up")
+	}
+	// The plane is still there (its report refreshed) a minute later: the emergency goes out, once.
+	state.Update(events.Position{Position: feeds.Position{
+		Hex: "e00001", Callsign: "ACA101", Squawk: "7700", Lat: 43.70, Lon: -79.62, AltFt: &alt, At: t0.Add(61 * time.Second),
+	}})
+	if got := w.Tick(context.Background(), t0.Add(61*time.Second)); len(got) != 1 || len(send.texts) != 1 {
+		t.Fatalf("after the failure: sent %v, texts %v", kinds(got), send.texts)
+	}
+	if got := w.Tick(context.Background(), t0.Add(63*time.Second)); len(got) != 0 {
+		t.Fatal("sent twice")
+	}
+}
+
+func TestLowPassJudgedWhereItEntersTheWindow(t *testing.T) {
+	// High in the sky now but outside the window's slice, entering it low at its edge: not "nearly over the window".
+	p := plane("10e003", "N55AB", "C172", 2000, func(p *live.Plane) {
+		p.ElevationDeg, p.Coming = 70, &live.Coming{InSec: 60, Side: "left", ElevationDeg: 12}
+	})
+	if got := kinds(Rules{}.Check(live.View{At: t0, Planes: []live.Plane{p}})); len(got) != 0 {
+		t.Fatalf("notices = %v", got)
 	}
 }
 
