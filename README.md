@@ -78,7 +78,14 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
    with their floors, the tall ship at its quay), so a landing plane touches the drawn runway; at night the runway's
    edge lights, the shore's lamps and lit windows. The clouds are the weather's: cumulus, altocumulus and cirrus in
    perspective, or an overcast deck, coloured by the sun and drifting with the wind; rain and snow show too. Between
-   planes the screen says the weather and the wind, and the runway it puts in use.
+   planes the screen says the weather and the wind, and the runway it puts in use. Each plane is a small 3D model of
+   its kind (high-wing turboprop, jet, rear-engined jet, widebody, light aircraft, helicopter) at its type's size and
+   in its airline's tail colour, turned to its heading, pitched to its climb and banked into its turns, seen as the
+   window sees it (from above when it is below the window) and shaded by the sun; at night its navigation lights sit
+   on the right wingtips and its landing lights glare when it points at the window. The plane in view gets a card:
+   what it is doing, the airline, type and registration, the trip from airport code to airport code with the time it
+   lands, its height, speed and climb, and for a flight at the followed airport a side view of its approach or climb
+   against the 3° path and the window's height.
    It can follow one airport (`OVERHEAD_AIRPORT`, Billy Bishop for now): then it shows only that airport's landings
    and take-offs and planes very close to the window (`OVERHEAD_NEAR_KM`), each told in full (on final for runway
    26 and when it touches down, or how long ago it took off; its height against the window's; where to look; the

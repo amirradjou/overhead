@@ -32,7 +32,7 @@ export function rank(p: Plane): number {
 }
 
 /** "Billy Bishop" for the followed airport's own end of a route, else the city: "Boston". */
-function endName(
+export function endName(
   a: { iata?: string; icao?: string; city?: string; name?: string },
   ap?: FollowedAirport,
 ): string {
@@ -130,6 +130,14 @@ export function lookWhere(p: Plane): string {
   const side = p.offset_deg < 0 ? "left" : "right";
   const across = off < 8 ? "straight ahead" : off < 25 ? `a little to the ${side}` : `to the ${side}`;
   return `${up}, ${across}`;
+}
+
+/** Where to look, in a few words for a tile: "4° down, right", "14° up, ahead". */
+export function lookShort(p: Plane): string {
+  const e = Math.round(p.elevation_deg);
+  const up = Math.abs(p.elevation_deg) < 1 ? "level" : e < 0 ? `${-e}° down` : `${e}° up`;
+  const side = Math.abs(p.offset_deg) < 8 ? "ahead" : p.offset_deg < 0 ? "left" : "right";
+  return `${up}, ${side}`;
 }
 
 /** One row of the airport's board. */

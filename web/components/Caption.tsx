@@ -1,30 +1,12 @@
 import { useMemo } from "react";
+import FlightCard from "./FlightCard";
 import { typeFactLines } from "@/lib/aircraft";
-import {
-  airportDay,
-  airportStatus,
-  feet,
-  fromToHere,
-  heightFromWindow,
-  lookWhere,
-  vertical,
-} from "@/lib/airport";
+import { airportDay, airportStatus } from "@/lib/airport";
 import { cloudLine, weatherLine } from "@/lib/weather";
 import { moonLine, sunLine } from "@/lib/almanac";
-import {
-  aircraftType,
-  arrival,
-  flightFacts,
-  flightName,
-  fromTo,
-  landing,
-  operator,
-  photoCredit,
-  speed,
-  webLink,
-} from "@/lib/format";
+import { arrival, flightFacts, flightName, fromTo, landing } from "@/lib/format";
 import { rotating } from "@/lib/pick";
-import { flightProgress, progressText } from "@/lib/progress";
+import { flightProgress } from "@/lib/progress";
 import type { Status } from "@/lib/useLiveView";
 import type { FollowedAirport, Plane, Weather, Window } from "@/lib/types";
 
@@ -65,16 +47,13 @@ export default function Caption({
   const lines = plane
     ? [following(alsoInView, next, home?.window), ...typeFactLines(plane), day].filter(Boolean)
     : [day, ...sky, ...facts, ...skyLines].filter(Boolean);
-  const full = plane && home && (plane.airport || plane.near);
   const line = rotating(lines, now, lineEvery);
   return (
     <section className="caption" aria-live="polite">
       {/* Keyed on the plane, so a new one fades in rather than overwriting the old one mid-sentence. */}
       <div className="caption-body" key={plane?.hex ?? next?.hex ?? status}>
-        {full ? (
-          <AirportFlight plane={plane} airport={airport} w={home.window} />
-        ) : plane ? (
-          <InView plane={plane} />
+        {plane && home ? (
+          <FlightCard plane={plane} airport={airport} w={home.window} now={now} />
         ) : (
           <Waiting next={next} status={status} w={home?.window} airport={airport} />
         )}
@@ -108,93 +87,6 @@ function useSkyLines(home: Props["home"], now: Date | null): string[] {
     if (lat === undefined || lon === undefined || !w || !now) return [];
     return [sunLine(lat, lon, now), moonLine(lat, lon, now, w)];
   }, [lat, lon, windowKey, now]);
-}
-
-function InView({ plane }: { plane: Plane }) {
-  const photo = plane.info?.photo;
-  const facts = flightFacts(plane);
-  const progress = flightProgress(plane);
-  return (
-    <div className="in-view">
-      {photo && (
-        // Linked to the photo's page on planespotters.net, as their terms ask.
-        <a className="photo" href={webLink(photo.link)} rel="noopener">
-          <figure>
-            <img src={photo.large || photo.thumbnail} alt="" />
-            <figcaption>{photoCredit(plane)}</figcaption>
-          </figure>
-        </a>
-      )}
-      <div>
-        {plane.notable && <p className="notable">{plane.notable}</p>}
-        <h1 className="flight">{flightName(plane)}</h1>
-        <Route plane={plane} done={progress?.done} fallback={operator(plane) || "Route unknown"} />
-        {progress && <p className="progress">{progressText(plane, progress)}</p>}
-        {facts && <p className="facts">{facts}</p>}
-        {landing(plane) && <p className="landing">{landing(plane)}</p>}
-      </div>
-    </div>
-  );
-}
-
-// AirportFlight is a flight at the followed airport, or a plane very close to the window, told in full: what it is
-// doing there, the trip, its height against the window's, its speed, where to look, and the airframe. Each line is
-// one sentence-like run of words, not a grid: old TV browsers ignore flex gaps.
-function AirportFlight({ plane, airport, w }: { plane: Plane; airport?: FollowedAirport; w: Window }) {
-  const photo = plane.info?.photo;
-  const progress = plane.on_ground ? null : flightProgress(plane); // a trip bar for a plane at the gate says nothing
-  const reg = plane.info?.registration || plane.registration;
-  const type = aircraftType(plane);
-  const motion = [speed(plane), vertical(plane)].filter(Boolean).join(", ");
-  const d = plane.distance_km;
-  const away = `${d < 10 ? d.toFixed(1) : Math.round(d)} km away`;
-  // Two lines, so the caption stays under the sill: how it flies, then where it is and what it is.
-  const stats: [string, string][][] = [
-    [
-      ["Height", [feet(plane), heightFromWindow(plane, w)].filter(Boolean).join(", ")],
-      ["Speed", motion],
-    ],
-    [
-      ["Look", `${lookWhere(plane)}, ${away}`],
-      ["Aircraft", [type, reg].filter(Boolean).join(", ")],
-    ],
-  ];
-  // An airline flight by its name; anything else by its registration, as it is painted on the plane.
-  const title = plane.info?.route?.airline ? flightName(plane) : reg || flightName(plane);
-  return (
-    <div className="in-view is-full">
-      {photo && (
-        <a className="photo" href={webLink(photo.link)} rel="noopener">
-          <figure>
-            <img src={photo.large || photo.thumbnail} alt="" />
-            <figcaption>{photoCredit(plane)}</figcaption>
-          </figure>
-        </a>
-      )}
-      <div>
-        <p className="notable">{plane.notable || airportStatus(plane, airport)}</p>
-        <h1 className="flight">{title}</h1>
-        <Route
-          plane={plane}
-          text={fromToHere(plane, airport)}
-          done={progress?.done}
-          fallback={operator(plane) || "Route unknown"}
-          after={progress ? progressText(plane, progress) : undefined}
-        />
-        {stats.map((row, i) => (
-          <p key={i} className="stats">
-            {row
-              .filter(([, v]) => v)
-              .map(([k, v]) => (
-                <span key={k} className="stat">
-                  <span className="stat-label">{k}</span> {v}
-                </span>
-              ))}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 // Route is "From San Francisco to Toronto", and the line under it is the trip: origin at its left end, destination at

@@ -25,6 +25,8 @@ const { values: args } = parseArgs({
     only: { type: "string" },
     size: { type: "string", default: "1920x1080" },
     serve: { type: "string" },
+    // With --serve: what the made-up feed shows (busy, coming, empty, island).
+    traffic: { type: "string", default: "busy" },
     chrome: { type: "string" },
     tz: { type: "string", default: "America/Toronto" },
     // Old Chromium builds crash their GPU process inside the sandbox on current kernels; the page is our own.
@@ -408,7 +410,7 @@ const photo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><re
 
 // serve starts the fake live API and the static screen; scene() picks what the stream sends.
 function serve(port) {
-  let traffic = "busy";
+  let traffic = args.traffic;
   const streams = new Set();
   const server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
