@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "lint": "prettier --check . && tsc --noEmit"
+    "lint": "prettier --check . && tsc --noEmit",
+    "screen-check": "node scripts/screen-check.mjs"
   },
   "browserslist": [
     "chrome >= 79",

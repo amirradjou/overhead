@@ -150,6 +150,18 @@ export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a
 ./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
 ```
 
+TV browsers are old: webOS 6 runs Chromium 79, and Samsung's 2021 sets Chromium 76. `pnpm screen-check` opens the
+built screen in the Chromium you name, against a made-up live feed, at night, under the moon, by day, at golden hour
+and at twilight. It saves a screenshot of each and fails on script errors, layout work while planes move, text
+smaller than 23 px at 1080p or text outside the TV-safe area:
+
+```sh
+npx @puppeteer/browsers install chromium@706915 --path ~/.cache/screen-check   # Chromium 79, once
+export CHROME=~/.cache/screen-check/chromium/linux-706915/chrome-linux/chrome
+(cd web && pnpm build && pnpm screen-check --no-sandbox)   # screenshots in web/screen-check/
+(cd web && node scripts/screen-check.mjs --serve 3999)  # the made-up feed alone, for a browser by hand
+```
+
 Facts between planes (M4) come from the history, worked out by a small Python job with DuckDB; the live API rereads
 the file it writes:
 
