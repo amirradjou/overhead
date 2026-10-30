@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Caption from "./Caption";
 import Overview from "./Overview";
 import Sky from "./Sky";
 import { sourceHomes } from "@/lib/format";
 import { comingNext, inView } from "@/lib/pick";
-import { skyPhase, sunElevation } from "@/lib/sun";
+import { skyColours } from "@/lib/skyColour";
+import { skyPhase, sunPosition } from "@/lib/sun";
 import { useLiveView } from "@/lib/useLiveView";
 
 const clockFormat = new Intl.DateTimeFormat("en-CA", {
@@ -21,17 +22,32 @@ export default function Screen() {
   const drift = useDrift();
   useSafeArea();
 
-  const phase = view && now ? skyPhase(sunElevation(view.center.lat, view.center.lon, now)) : "night";
+  const lat = view?.center.lat;
+  const lon = view?.center.lon;
+  const sun = useMemo(
+    () => (lat !== undefined && lon !== undefined && now ? sunPosition(lat, lon, now) : null),
+    [lat, lon, now],
+  );
+  const phase = sun ? skyPhase(sun.alt) : "night";
+  const colours = skyColours(sun?.alt ?? -30);
   const planes = view?.planes ?? [];
   const visible = inView(planes);
   const next = comingNext(planes)[0];
   const sources = view?.sources ?? [];
 
   return (
-    <main className={`screen sky-${phase}${status === "live" ? "" : " is-stale"}`}>
+    <main
+      className={`screen sky-${phase}${status === "live" ? "" : " is-stale"}`}
+      style={
+        {
+          background: `linear-gradient(to bottom, ${colours.top} 0%, ${colours.mid} 45%, ${colours.low} var(--roofline))`,
+          "--roof": colours.roof,
+        } as React.CSSProperties
+      }
+    >
       {/* The whole scene, rooftops and words alike, drifts a few pixels now and then, so nothing burns into a TV. */}
       <div className="scene" style={{ transform: `translate(${drift.x}px, ${drift.y}px)` }}>
-        <Sky view={view} phase={phase} featuredHex={visible[0]?.hex} next={next} />
+        <Sky view={view} now={now} phase={phase} sun={sun} featuredHex={visible[0]?.hex} next={next} />
         <div className="overlay">
           <p className="clock">
             {now && clockFormat.format(now)}

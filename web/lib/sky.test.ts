@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   compassTicks,
+  inFrame,
   nearestTurn,
+  offsetFrom,
   overviewTurn,
   polar,
   roofline,
   rooftops,
   seeded,
-  stars,
   toScreen,
   topDeg,
 } from "./sky";
@@ -61,7 +62,18 @@ describe("the window on screen", () => {
     expect(nearestTurn(0, -90)).toBe(-90);
   });
 
-  it("draws the same rooftops and stars every time, never above the roofline", () => {
+  it("knows what the window frames", () => {
+    expect(offsetFrom(south, 180)).toBe(0);
+    expect(offsetFrom(south, 225)).toBe(45);
+    expect(offsetFrom(south, 90)).toBe(-90);
+    expect(offsetFrom(allRound, 350)).toBe(-10);
+    expect(inFrame(south, 44, 30)).toBe(true);
+    expect(inFrame(south, 46, 30)).toBe(false);
+    expect(inFrame(south, 0, 4)).toBe(false); // behind the roofs
+    expect(inFrame(south, 0, topDeg + 1)).toBe(false); // above the top of the frame
+  });
+
+  it("draws the same rooftops every time, never above the roofline", () => {
     expect(rooftops()).toBe(rooftops());
     const path = rooftops();
     const tops = [...path.matchAll(/[\d.]+,([\d.]+)/g)].map((m) => Number(m[1]));
@@ -69,9 +81,6 @@ describe("the window on screen", () => {
     // One outline: a single move, closed at the end, so the fill can't come apart.
     expect(path.match(/M/g)).toHaveLength(1);
     expect(path.endsWith("Z")).toBe(true);
-    const s = stars(50);
-    expect(s).toEqual(stars(50));
-    expect(s.every((st) => st.y < roofline)).toBe(true);
     const r = seeded(1);
     expect(r()).not.toBe(r());
   });

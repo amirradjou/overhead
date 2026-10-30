@@ -61,21 +61,8 @@ a {
   overflow: hidden;
 }
 
-/* The sky by the sun's height. Each gradient ends at the roofline; the rooftops cover the rest. */
-.sky-night {
-  background: linear-gradient(to bottom, #040a1a 0%, #0a1634 45%, #1a2a4f var(--roofline));
-}
-.sky-twilight {
-  background: linear-gradient(to bottom, #0c1535 0%, #36396a 38%, #8a5d84 58%, #e3936a var(--roofline));
-}
-.sky-golden {
-  background: linear-gradient(to bottom, #2a4c78 0%, #7d9ab7 40%, #e8b98b var(--roofline));
-}
-.sky-day {
-  /* Muted: a TV left on all day should not be a light box. */
-  background: linear-gradient(to bottom, #2c5274 0%, #557c9b 45%, #7f9cb1 var(--roofline));
-  --roof: #18222d;
-}
+/* The sky's colours follow the sun continuously (lib/skyColour.ts) and are set on .screen; the phase classes only
+   switch what changes at a threshold: navigation lights after dark, dimmer words at night. */
 
 .scene,
 .sky,
@@ -92,8 +79,39 @@ a {
   width: 100%;
   height: 100%;
 }
-.stars circle {
-  fill: #fff;
+
+/* The light round the sun: a wide soft ellipse, centred where the sun is, even beside or below the window. */
+.sun-glow {
+  position: absolute;
+  width: 110vw;
+  height: 70vh;
+  transform: translate(-50%, -50%);
+  transition: opacity 20s linear;
+}
+
+.moon {
+  position: absolute;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin: -0.85rem 0 0 -0.85rem;
+  border-radius: 50%;
+}
+.moon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.moon-dark {
+  fill: rgb(255 255 255 / 0.05); /* earthshine, only just */
+}
+.moon-lit {
+  fill: rgb(236 242 248 / 0.6); /* by day: pale, as the daytime moon is */
+}
+.moon.is-night {
+  box-shadow: 0 0 1.6rem 0.4rem rgb(255 246 225 / 0.12);
+}
+.moon.is-night .moon-lit {
+  fill: #f3ecda;
 }
 .roofs {
   overflow: visible; /* the outline bleeds past the edges, for the drift */

@@ -24,6 +24,19 @@ export function nearestTurn(prev: number, next: number): number {
   return prev + ((((next - prev) % 360) + 540) % 360) - 180;
 }
 
+/** How far right of the window's centre something at azimuth azDeg is, in degrees from -180 to 180. */
+export function offsetFrom(w: Window, azDeg: number): number {
+  return ((((azDeg - w.azimuth_deg) % 360) + 540) % 360) - 180;
+}
+
+/** Whether something offsetDeg right of the window's centre and elevationDeg up is in the frame: over the roofs, below
+ * the top edge and between the sides. */
+export function inFrame(w: Window, offsetDeg: number, elevationDeg: number): boolean {
+  return (
+    Math.abs(offsetDeg) <= w.fov_deg / 2 && elevationDeg >= w.min_elevation_deg && elevationDeg <= topDeg
+  );
+}
+
 /** The compass points across the window, with their screen position. */
 export function compassTicks(w: Window): { label: string; x: number }[] {
   const names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -51,7 +64,7 @@ export function polar(deg: number, d: number): { x: number; y: number } {
   return { x: d * Math.sin(a), y: -d * Math.cos(a) };
 }
 
-/** A small seeded random generator (mulberry32), so stars and rooftops come out the same on every load. */
+/** A small seeded random generator (mulberry32), so the rooftops come out the same on every load. */
 export function seeded(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -95,15 +108,4 @@ export function rooftops(seed = 7): string {
   }
   pts.push([1000 + bleed, 1000 + bleed]);
   return "M" + pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" L") + " Z";
-}
-
-/** Stars for a night sky: positions above the roofline and a brightness each. */
-export function stars(count: number, seed = 11): { x: number; y: number; a: number; r: number }[] {
-  const rand = seeded(seed);
-  return Array.from({ length: count }, () => ({
-    x: rand(),
-    y: rand() * roofline * 0.95,
-    a: 0.25 + rand() * 0.6,
-    r: rand() < 0.08 ? 1.6 : 0.9,
-  }));
 }

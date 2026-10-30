@@ -2,39 +2,94 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { label } from "@/lib/format";
-import { compassTicks, nearestTurn, roofline, rooftops, stars, toScreen, topDeg } from "@/lib/sky";
-import type { SkyPhase } from "@/lib/sun";
+import {
+  compassTicks,
+  inFrame,
+  nearestTurn,
+  offsetFrom,
+  roofline,
+  rooftops,
+  toScreen,
+  topDeg,
+} from "@/lib/sky";
+import { sunGlow } from "@/lib/skyColour";
+import { magnitudeLimit, starColour, starsAbove } from "@/lib/stars";
+import { moonAt, moonPath, type SkyPhase } from "@/lib/sun";
 import type { Plane, View, Window } from "@/lib/types";
 
 interface Props {
   view: View | null;
+  now: Date | null;
   phase: SkyPhase;
+  sun: { alt: number; az: number } | null;
   featuredHex?: string;
   next?: Plane;
 }
 
 const trailPoints = 15; // 30 s of positions at one snapshot every 2 s
 
-// The window: sky, stars after dark, the rooftops opposite, the planes in view and a cue where the next one appears.
-export default function Sky({ view, phase, featuredHex, next }: Props) {
+// The window: the sky as it is outside (the light round the sun, the real stars and the moon where they are), the
+// rooftops opposite, the planes in view and a cue where the next one appears.
+export default function Sky({ view, now, phase, sun, featuredHex, next }: Props) {
   const roofs = useMemo(() => rooftops(), []);
-  const starField = useMemo(() => stars(160), []);
-  const w = view?.window;
+  // A new window object arrives with every snapshot; the same window, the same object, so the sky is not redone.
+  const snapshotWindow = view?.window;
+  const w = useMemo(
+    () => snapshotWindow,
+    [snapshotWindow?.azimuth_deg, snapshotWindow?.fov_deg, snapshotWindow?.min_elevation_deg],
+  );
+  const lat = view?.center.lat;
+  const lon = view?.center.lon;
   const visible = useMemo(() => view?.planes.filter((p) => p.in_view) ?? [], [view]);
   const trails = useTrails(visible, w);
   const size = useScreenSize();
   const dark = phase === "night" || phase === "twilight";
 
+  // The heavens move slowly: worked out again only when the clock (every 20 s) or the window changes.
+  const heavens = useMemo(() => {
+    if (!w || !now || lat === undefined || lon === undefined || !sun) return null;
+    const stars = starsAbove(lat, lon, now, magnitudeLimit(sun.alt)).flatMap((st) => {
+      const off = offsetFrom(w, st.az);
+      return inFrame(w, off, st.alt) ? [{ ...toScreen(w, off, st.alt), mag: st.mag, bv: st.bv }] : [];
+    });
+    const m = moonAt(lat, lon, now);
+    const moonOff = offsetFrom(w, m.az);
+    const moon = inFrame(w, moonOff, m.alt) ? { ...m, ...toScreen(w, moonOff, m.alt) } : null;
+    const sunOff = offsetFrom(w, sun.az);
+    const sunY = sun.alt > w.min_elevation_deg ? toScreen(w, sunOff, sun.alt).y : roofline;
+    return { stars, moon, glow: sunGlow(sun.alt, sunOff, w.fov_deg, sunY), limit: magnitudeLimit(sun.alt) };
+  }, [w, now, lat, lon, sun]);
+  const scale = size ? size.height / 1080 : 1;
+
   return (
     <div className="sky" aria-hidden="true">
-      {dark && (
+      {heavens?.glow && (
+        <div
+          className="sun-glow"
+          style={{
+            left: `${heavens.glow.x * 100}%`,
+            top: `${heavens.glow.y * 100}%`,
+            opacity: heavens.glow.opacity,
+            background: `radial-gradient(closest-side, ${heavens.glow.colour}, transparent)`,
+          }}
+        />
+      )}
+      {heavens && heavens.stars.length > 0 && (
         // No viewBox: positions in percent, radii in pixels, so a star is round on any screen shape.
         <svg className="stars">
-          {starField.map((s, i) => (
-            <circle key={i} cx={`${s.x * 100}%`} cy={`${s.y * 100}%`} r={s.r} opacity={s.a} />
+          {heavens.stars.map((st, i) => (
+            <circle
+              key={i}
+              cx={`${(st.x * 100).toFixed(2)}%`}
+              cy={`${(st.y * 100).toFixed(2)}%`}
+              r={(Math.min(2.8, Math.max(1.05, 2.4 - 0.3 * st.mag)) * scale).toFixed(2)}
+              fill={starColour(st.bv)}
+              opacity={Math.min(1, Math.max(0.3, 0.45 + (heavens.limit - st.mag) * 0.18)).toFixed(2)}
+            />
           ))}
         </svg>
       )}
+      {heavens?.moon && <MoonDisc moon={heavens.moon} dark={dark} />}
       {w && (
         <svg className="trails" viewBox="0 0 1000 1000" preserveAspectRatio="none">
           {/* Up to where the plane was at the last snapshot: it glides on from there, so the trail follows it. */}
@@ -69,6 +124,32 @@ export default function Sky({ view, phase, featuredHex, next }: Props) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// MoonDisc is the moon where it stands in the window, lit on the side that faces the sun, as seen from home. It is
+// drawn larger than life (the real one is half a degree, a few pixels here), as the eye remembers it.
+function MoonDisc({
+  moon,
+  dark,
+}: {
+  moon: { x: number; y: number; fraction: number; limbDeg: number };
+  dark: boolean;
+}) {
+  return (
+    <div
+      className={`moon${dark ? " is-night" : ""}`}
+      style={{ left: `${moon.x * 100}%`, top: `${moon.y * 100}%` }}
+    >
+      <svg viewBox="-1 -1 2 2">
+        <circle className="moon-dark" r={1} />
+        <path
+          className="moon-lit"
+          d={moonPath(moon.fraction, 1)}
+          transform={`rotate(${(-moon.limbDeg).toFixed(1)})`}
+        />
+      </svg>
     </div>
   );
 }
