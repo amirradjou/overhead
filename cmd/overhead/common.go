@@ -159,6 +159,7 @@ func addWindowFlags(fs *flag.FlagSet) (*live.Window, error) {
 		{&w.AzimuthDeg, "window-az", "OVERHEAD_WINDOW_AZ", "the direction the window faces, degrees from north (180: south)"},
 		{&w.FOVDeg, "window-fov", "OVERHEAD_WINDOW_FOV", "how wide a slice of sky the window shows, in degrees (360: all round)"},
 		{&w.MinElevationDeg, "window-min-el", "OVERHEAD_WINDOW_MIN_EL", "the lowest angle above the horizon visible over what stands opposite"},
+		{&w.MaxElevationDeg, "window-max-el", "OVERHEAD_WINDOW_MAX_EL", "the highest angle visible, at the window's top edge as seen from where you sit (90: no edge)"},
 		{&w.HomeElevationM, "home-elev", "OVERHEAD_HOME_ELEV", "the window's height above sea level, in metres"},
 	} {
 		v, err := envFloat(f.env, *f.dst)

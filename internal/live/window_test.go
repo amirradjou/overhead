@@ -49,7 +49,7 @@ func TestComingAroundTheLeftEdge(t *testing.T) {
 func TestComingOverTheHouse(t *testing.T) {
 	// From behind the house, heading straight over it.
 	c := south.coming(pearson, flying(0, 5, 5000, 180, 200, 0), t0)
-	if c == nil || c.Side != "above" || c.ElevationDeg < overheadDeg {
+	if c == nil || c.Side != "above" || c.ElevationDeg < 60 {
 		t.Fatalf("coming = %+v", c)
 	}
 }
@@ -96,7 +96,7 @@ func TestViewPlacesPlanesInTheWindow(t *testing.T) {
 	s.Update(events.Position{Position: left})
 
 	v := s.View(t0)
-	if v.Window != south {
+	if v.Window != south.normalised() { // the view reports the window with its top edge filled in
 		t.Fatalf("window = %+v", v.Window)
 	}
 	byHex := map[string]Plane{}
@@ -108,6 +108,28 @@ func TestViewPlacesPlanesInTheWindow(t *testing.T) {
 	}
 	if p := byHex["def456"]; p.InView || p.Coming == nil || p.Coming.Side != "left" || p.OffsetDeg > -45 {
 		t.Errorf("coming: %+v", p)
+	}
+}
+
+func TestTheWindowsTopEdge(t *testing.T) {
+	framed := Window{AzimuthDeg: 180, FOVDeg: 90, MinElevationDeg: 5, MaxElevationDeg: 30}
+	high := flying(180, 5, 10000, 90, 250, 0) // 31° up: above the frame
+	h, _ := heightKm(high)
+	if s := framed.sight(pearson, high.Point(), h); framed.sees(s) {
+		t.Fatalf("a plane above the window's top edge is not in view: %+v", s)
+	}
+	lower := flying(180, 15, 10000, 90, 250, 0) // 11° up
+	h, _ = heightKm(lower)
+	if s := framed.sight(pearson, lower.Point(), h); !framed.sees(s) {
+		t.Fatalf("a plane below the top edge is in view: %+v", s)
+	}
+	// Flying away south from high overhead, it sinks past the frame's top edge into view.
+	c := framed.coming(pearson, flying(180, 3, 10000, 180, 250, 0), t0)
+	if c == nil || c.Side != "above" || c.ElevationDeg > 30 {
+		t.Fatalf("coming = %+v", c)
+	}
+	if got := (Window{MinElevationDeg: 5, MaxElevationDeg: 3}).normalised().MaxElevationDeg; got != 90 {
+		t.Fatalf("an impossible top edge means none, got %v", got)
 	}
 }
 

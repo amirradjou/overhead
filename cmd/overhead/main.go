@@ -33,7 +33,7 @@ environment:
   OVERHEAD_AMQP                RabbitMQ (default amqp://overhead:overhead@localhost:5673/, compose.yaml)
   OVERHEAD_DATA                where enrich and history keep their files (default ./data)
   OVERHEAD_TZ                  the time zone of "today", e.g. America/Toronto (default: the system's)
-  OVERHEAD_WINDOW_AZ, _FOV, _MIN_EL, OVERHEAD_HOME_ELEV
+  OVERHEAD_WINDOW_AZ, _FOV, _MIN_EL, _MAX_EL, OVERHEAD_HOME_ELEV
                                the window the screen draws (live, headsup; default: all round, down to 5°)
   OVERHEAD_TELEGRAM_TOKEN, OVERHEAD_TELEGRAM_CHAT
                                where heads-ups go (headsup; without them they are only logged)

@@ -100,3 +100,13 @@ def test_an_evening_across_midnight_is_not_two_days(tmp_path: Path) -> None:
     )
     got = facts(connect(tmp_path, *HOME), late + timedelta(minutes=50), TZ, SOUTH)
     assert not any("first time" in f for f in got), got
+
+
+def test_cli_with_no_history_yet_writes_no_facts(tmp_path: Path) -> None:
+    import json
+
+    from overhead_stats.cli import main
+
+    out = tmp_path / "facts.json"
+    assert main(["facts", "--history", str(tmp_path / "empty"), "--out", str(out)]) == 0
+    assert json.loads(out.read_text())["facts"] == []

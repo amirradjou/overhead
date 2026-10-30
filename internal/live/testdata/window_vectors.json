@@ -1,0 +1,162 @@
+{
+  "home": {
+    "lat": 43.6777,
+    "lon": -79.6248
+  },
+  "cases": [
+    {
+      "name": "15 km straight ahead at 10,000 ft",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.542802,
+      "lon": -79.6248,
+      "alt_ft": 10000,
+      "in_view": true
+    },
+    {
+      "name": "15 km off to the side",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.677548,
+      "lon": -79.43828,
+      "alt_ft": 10000,
+      "in_view": false
+    },
+    {
+      "name": "above the window's top edge (31 degrees, top at 30)",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 30,
+        "home_elevation_m": 0
+      },
+      "lat": 43.632734,
+      "lon": -79.6248,
+      "alt_ft": 10000,
+      "in_view": false
+    },
+    {
+      "name": "below the top edge (11 degrees)",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 30,
+        "home_elevation_m": 0
+      },
+      "lat": 43.542802,
+      "lon": -79.6248,
+      "alt_ft": 10000,
+      "in_view": true
+    },
+    {
+      "name": "beyond 40 km",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.183074,
+      "lon": -79.6248,
+      "alt_ft": 30000,
+      "in_view": false
+    },
+    {
+      "name": "below the rooftops (under 1 degree)",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.497836,
+      "lon": -79.6248,
+      "alt_ft": 1000,
+      "in_view": false
+    },
+    {
+      "name": "all round, behind the house",
+      "window": {
+        "azimuth_deg": 0,
+        "fov_deg": 360,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.812598,
+      "lon": -79.6248,
+      "alt_ft": 10000,
+      "in_view": true
+    },
+    {
+      "name": "a home 300 m up sees it 1.7 degrees up, under a 2-degree roofline",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 2,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 300
+      },
+      "lat": 43.497836,
+      "lon": -79.6248,
+      "alt_ft": 3000,
+      "in_view": false
+    },
+    {
+      "name": "the same plane from sea level, 2.6 degrees up",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 2,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.497836,
+      "lon": -79.6248,
+      "alt_ft": 3000,
+      "in_view": true
+    },
+    {
+      "name": "a window facing 350 degrees sees a plane at 5 degrees",
+      "window": {
+        "azimuth_deg": 350,
+        "fov_deg": 40,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 90,
+        "home_elevation_m": 0
+      },
+      "lat": 43.812084,
+      "lon": -79.608507,
+      "alt_ft": 10000,
+      "in_view": true
+    },
+    {
+      "name": "an unset top edge means none (45 degrees up)",
+      "window": {
+        "azimuth_deg": 180,
+        "fov_deg": 90,
+        "min_elevation_deg": 5,
+        "max_elevation_deg": 0,
+        "home_elevation_m": 0
+      },
+      "lat": 43.65072,
+      "lon": -79.6248,
+      "alt_ft": 10000,
+      "in_view": true
+    }
+  ]
+}

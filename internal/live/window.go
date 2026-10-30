@@ -8,18 +8,21 @@ import (
 	"github.com/amirradjou/overhead/internal/geo"
 )
 
-// Window is the view from home: the direction the window faces, how wide a slice of sky it shows, and the lowest
-// angle above the horizon you can see over whatever stands opposite.
+// Window is the view from home: the direction the window faces, how wide a slice of sky it shows, the lowest angle
+// above the horizon you can see over whatever stands opposite, and the highest, where the window's top edge cuts the
+// sky off (seen from where you sit; README: Window setup).
 type Window struct {
 	AzimuthDeg      float64 `json:"azimuth_deg"`
 	FOVDeg          float64 `json:"fov_deg"`
 	MinElevationDeg float64 `json:"min_elevation_deg"`
+	MaxElevationDeg float64 `json:"max_elevation_deg"`
 	// HomeElevationM is the window's height above sea level, which aircraft altitudes are measured from too.
 	HomeElevationM float64 `json:"home_elevation_m"`
 }
 
-// DefaultWindow sees all round down to 5°, the view from a balcony or a field, until settings describe a window.
-var DefaultWindow = Window{FOVDeg: 360, MinElevationDeg: 5}
+// DefaultWindow sees all round from 5° up to the zenith, the view from a balcony or a field, until settings describe
+// a window.
+var DefaultWindow = Window{FOVDeg: 360, MinElevationDeg: 5, MaxElevationDeg: 90}
 
 // visibleKm is how far away a plane may be and still count as in view: beyond it an airliner is a speck by day and
 // one light among many at night.
@@ -31,16 +34,25 @@ const (
 	step      = 5 * time.Second
 )
 
-// overheadDeg: a plane entering the window's slice of sky this high came over the house, not round its side.
-const overheadDeg = 60.0
-
 func (w Window) normalised() Window {
 	if w.FOVDeg <= 0 || w.FOVDeg > 360 {
 		w.FOVDeg = DefaultWindow.FOVDeg
 	}
 	w.AzimuthDeg = math.Mod(math.Mod(w.AzimuthDeg, 360)+360, 360)
+	w.MaxElevationDeg = w.top()
 	return w
 }
+
+// top is the window's top edge; unset or impossible means none (the zenith).
+func (w Window) top() float64 {
+	if w.MaxElevationDeg <= w.MinElevationDeg || w.MaxElevationDeg > 90 {
+		return 90
+	}
+	return w.MaxElevationDeg
+}
+
+// zenithDeg: a plane this high just outside the window's slice is crossing over the house, not round its side.
+const zenithDeg = 75.0
 
 // sight is where something heightKm above sea level at p is seen from the window at home.
 type sight struct {
@@ -58,14 +70,14 @@ func (w Window) sight(home, p geo.Point, heightKm float64) sight {
 
 func (w Window) sees(s sight) bool {
 	inSlice := w.FOVDeg >= 360 || math.Abs(s.offset) <= w.FOVDeg/2
-	return inSlice && s.elevation >= w.MinElevationDeg && s.distance <= visibleKm
+	return inSlice && s.elevation >= w.MinElevationDeg && s.elevation <= w.top() && s.distance <= visibleKm
 }
 
 // Coming is a plane about to come into view.
 type Coming struct {
 	InSec float64 `json:"in_s"`
 	// Side is where it appears: "left" or "right" (round the window's edge), "rooftops" (rising over what stands
-	// opposite), "above" (over the house) or "distance" (closing in from far off, straight ahead).
+	// opposite), "above" (down past the window's top edge) or "distance" (closing in from far off, straight ahead).
 	Side string `json:"side"`
 	// OffsetDeg and ElevationDeg place where it appears.
 	OffsetDeg    float64 `json:"offset_deg"`
@@ -164,19 +176,18 @@ func (w Window) motion(home geo.Point, p feeds.Position, age float64, now sight)
 
 // side names where a plane appears from, given where it was just before.
 func (w Window) side(before sight) string {
+	// Named after the edge the plane crosses: whichever limit it was outside of just before it came into view.
+	outside := w.FOVDeg < 360 && math.Abs(before.offset) > w.FOVDeg/2
 	switch {
-	case w.FOVDeg < 360 && math.Abs(before.offset) > w.FOVDeg/2:
-		if before.elevation > overheadDeg {
-			return "above"
-		}
+	case before.elevation > w.top(), outside && before.elevation > zenithDeg:
+		return "above"
+	case outside:
 		if before.offset < 0 {
 			return "left"
 		}
 		return "right"
 	case before.elevation < w.MinElevationDeg:
 		return "rooftops"
-	case before.distance > visibleKm:
-		return "distance"
 	}
-	return "above"
+	return "distance"
 }

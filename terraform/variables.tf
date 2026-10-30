@@ -39,3 +39,9 @@ variable "snowflake" {
   type        = bool
   default     = true
 }
+
+variable "budget_email" {
+  description = "Where the US$5 monthly cost alert goes (README: Cost). make up refuses to run without it."
+  type        = string
+  default     = ""
+}

@@ -1,6 +1,26 @@
-# Local services. `docker compose up -d` starts RabbitMQ; the overhead commands run on the host (README: Run it).
-# Host ports are shifted (5673, 15673) to stay clear of other projects' brokers.
+# The whole stack on one always-on machine (README: Where it runs): `docker compose up -d`, then open
+# http://<this machine>:8090 on the TV. Settings come from .env (see .env.example): home, the window, the time zone.
+# For development with the commands on the host, start only the broker: `docker compose up -d rabbitmq`.
 name: overhead
+
+# Shared by every overhead service: one image, the broker inside the compose network, one data volume (enrichment
+# cache, history batches, heads-up ledger, facts).
+x-overhead: &overhead
+  image: overhead:local
+  pull_policy: never # built by the poll service below
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    OVERHEAD_AMQP: amqp://overhead:overhead@rabbitmq:5672/
+    OVERHEAD_DATA: /data
+  volumes:
+    - data:/data
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+  restart: unless-stopped
+  mem_limit: 128m
 
 services:
   rabbitmq:
@@ -22,6 +42,44 @@ services:
       retries: 6
     restart: unless-stopped
 
+  poll:
+    <<: *overhead
+    build: .
+    pull_policy: build
+    command: ["poll"]
+
+  enrich:
+    <<: *overhead
+    command: ["enrich"]
+
+  history:
+    <<: *overhead
+    command: ["history"]
+
+  live:
+    <<: *overhead
+    command: ["live", "-web", "/web"]
+    ports:
+      # The TV reads it over the home network. It serves home's coordinates: keep it off the internet.
+      - "8090:8090"
+
+  headsup:
+    <<: *overhead
+    command: ["headsup"]
+
+  facts:
+    image: overhead-stats:local
+    build: ./analysis
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OVERHEAD_DATA: /data
+    volumes:
+      - data:/data
+    restart: unless-stopped
+    mem_limit: 384m
+
   # An S3-compatible server for the history writer's S3 store, only with `--profile s3`: rclone serves a directory
   # over the S3 API. Buckets are its top-level directories; overhead and overhead-test exist from the start.
   s3:
@@ -40,3 +98,4 @@ services:
 volumes:
   rabbitmq:
   s3:
+  data:

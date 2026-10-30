@@ -118,10 +118,18 @@ OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38 ./bin/overhead watch -radius 20
 ./bin/overhead watch -for 1h > run.log   # M0's check: one line per poll, then pass/fail on gaps and duplicates
 ```
 
-The event pipeline (M1), each command in its own terminal or under a process manager:
+The whole stack on an always-on machine (README item 10): put your home and window in `.env` (see `.env.example`),
+then
 
 ```sh
-docker compose up -d                 # RabbitMQ; management UI on http://localhost:15673 (overhead / overhead)
+docker compose up -d                 # RabbitMQ, poll, enrich, history, live, headsup and the facts job
+open http://<this machine>:8090      # on the TV; the RabbitMQ UI is on http://localhost:15673 (overhead / overhead)
+```
+
+For development, the same event pipeline (M1) with the commands on the host, each in its own terminal:
+
+```sh
+docker compose up -d rabbitmq        # just the broker
 ./bin/overhead enrich                # enrichment worker; cache in data/enrich.db
 ./bin/overhead history               # one-minute batches in data/history/positions/dt=.../hour=.../
 ./bin/overhead live                  # http://localhost:8090/api/now, /api/events (SSE), /api/coverage
@@ -137,6 +145,7 @@ export OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38   # the window, not the airport
 export OVERHEAD_WINDOW_AZ=200                   # it faces south-south-west
 export OVERHEAD_WINDOW_FOV=100                  # and shows 100 degrees of sky
 export OVERHEAD_WINDOW_MIN_EL=8                 # over rooftops 8 degrees high
+export OVERHEAD_WINDOW_MAX_EL=40                # up to the window's top edge, 40 degrees, as seen from the sofa
 export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a container runs in UTC)
 ./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
 ```

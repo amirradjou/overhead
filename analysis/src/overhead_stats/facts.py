@@ -20,6 +20,7 @@ class Window:
     fov_deg: float = 360
     min_elevation_deg: float = 5
     home_elevation_m: float = 0
+    max_elevation_deg: float = 90
 
 
 # Must match internal/live: a plane farther than this isn't counted as in view.
@@ -134,12 +135,19 @@ def _prepare(con: duckdb.DuckDBPyConnection, tz: str, w: Window) -> None:
             FROM positions
             WHERE alt_ft IS NOT NULL AND NOT coalesce(on_ground, false)
         )
+        , seen AS (
+            SELECT *, degrees(atan2(h - d * d / (2 * 6371.0088 * 4 / 3), greatest(d, 1e-6))) AS elevation FROM placed
+        )
         SELECT hex, ("at" AT TIME ZONE getvariable('tz'))::DATE AS local_day,
-            degrees(atan2(h - d * d / (2 * 6371.0088 * 4 / 3), greatest(d, 1e-6))) >= getvariable('min_elevation_deg')
+            elevation >= getvariable('min_elevation_deg')
+            -- An unset or impossible top edge means none, as internal/live: Window.top.
+            AND (elevation <= getvariable('max_elevation_deg')
+                 OR getvariable('max_elevation_deg') <= getvariable('min_elevation_deg')
+                 OR getvariable('max_elevation_deg') > 90)
             AND (getvariable('fov_deg') >= 360
                  OR abs(((bearing - getvariable('azimuth_deg') + 540) % 360) - 180) <= getvariable('fov_deg') / 2)
             AND d <= {VISIBLE_KM} AS in_view
-        FROM placed
+        FROM seen
         """
     )
 
