@@ -61,3 +61,18 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+
+  analysis:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analysis
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: Lint (ruff)
+        run: uv run ruff format --check . && uv run ruff check .
+      - name: Test
+        run: uv run pytest -q
