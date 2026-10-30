@@ -109,6 +109,20 @@ docker compose up -d                 # RabbitMQ; management UI on http://localho
 ./bin/overhead verify                # checks data/history: every published position stored exactly once
 ```
 
+The window view (M2): build the screen once, then let the live API serve it and open it full screen on the TV.
+
+```sh
+(cd web && pnpm install && pnpm build)          # static files in web/out
+export OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38   # the window, not the airport
+export OVERHEAD_WINDOW_AZ=200                   # it faces south-south-west
+export OVERHEAD_WINDOW_FOV=100                  # and shows 100 degrees of sky
+export OVERHEAD_WINDOW_MIN_EL=8                 # over rooftops 8 degrees high
+./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
+```
+
+Without window settings the screen shows the whole sky round home, down to 5 degrees. `pnpm dev` in `web/` serves the
+screen with hot reload; add `?api=http://localhost:8090` to the address to point it at a running live API.
+
 Every position event carries the poller's run id and a sequence number, so `verify` can prove nothing was lost or
 stored twice. The history writer acknowledges a batch only after writing it, and a batch's file name comes from its
 first sequence number, so a redelivered batch overwrites its own file. Changing a queue's arguments in
