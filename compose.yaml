@@ -1,0 +1,26 @@
+# Local services. `docker compose up -d` starts RabbitMQ; the overhead commands run on the host (README: Run it).
+# Host ports are shifted (5673, 15673) to stay clear of other projects' brokers.
+name: overhead
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: overhead-rabbitmq # RabbitMQ keys its data directory by node name, so keep it fixed
+    environment:
+      RABBITMQ_DEFAULT_USER: overhead
+      RABBITMQ_DEFAULT_PASS: overhead
+    ports:
+      - "127.0.0.1:5673:5672" # AMQP
+      - "127.0.0.1:15673:15672" # management UI: http://localhost:15673 (overhead / overhead)
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+    restart: unless-stopped
+
+volumes:
+  rabbitmq:

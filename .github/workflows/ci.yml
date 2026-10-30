@@ -10,6 +10,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      # For the broker integration tests (internal/bus); RABBITMQ_DEFAULT_VHOST makes the vhost they purge.
+      rabbitmq:
+        image: rabbitmq:4.1-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: overhead
+          RABBITMQ_DEFAULT_PASS: overhead
+          RABBITMQ_DEFAULT_VHOST: overhead-test
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 10s --health-retries 20
+    env:
+      OVERHEAD_TEST_AMQP: amqp://overhead:overhead@localhost:5672/overhead-test
     steps:
       - uses: actions/checkout@v4
         with:
