@@ -32,6 +32,8 @@ type State struct {
 	MaxAge   time.Duration
 	// Public keeps only commercial flights in views (README privacy rule).
 	Public bool
+	// Window is the view the screen draws; the zero value is DefaultWindow.
+	Window Window
 
 	mu       sync.Mutex
 	pos      map[string]feeds.Position
@@ -41,6 +43,10 @@ type State struct {
 	flights  map[string]*flight
 	received uint64
 	pruned   time.Time
+
+	predicted                           map[string]prediction
+	predErrors                          []float64
+	predChecked, predWithin, predMissed int
 }
 
 // flight is one commercial flight's pass through the circle, for the coverage tally.
@@ -67,10 +73,14 @@ func (s *State) Update(e events.Position) {
 		return
 	}
 	s.pos[e.Hex] = e.Position
-	if day := e.At.Local().Format(time.DateOnly); day != s.day {
+	// A new day only moves forward, and a late report from before midnight counts toward its own day, not today.
+	day := e.At.Local().Format(time.DateOnly)
+	if day > s.day {
 		s.day, s.today = day, make(map[string]struct{})
 	}
-	s.today[e.Hex] = struct{}{}
+	if day == s.day {
+		s.today[e.Hex] = struct{}{}
+	}
 	s.track(e.Position)
 }
 
@@ -124,6 +134,53 @@ type Plane struct {
 	// ToDestinationKm and ETAMin are set when the route's destination is known and within reach.
 	ToDestinationKm *float64 `json:"to_destination_km,omitempty"`
 	ETAMin          *float64 `json:"eta_min,omitempty"`
+	// Notable says why the screen's banner should show this aircraft; empty for most.
+	Notable string `json:"notable,omitempty"`
+	// ElevationDeg and OffsetDeg place the plane as seen from the window: degrees above the horizon, and degrees
+	// right (+) or left (-) of the window's centre. InView says the window shows it now; Coming, when it will.
+	ElevationDeg float64 `json:"elevation_deg"`
+	OffsetDeg    float64 `json:"offset_deg"`
+	InView       bool    `json:"in_view"`
+	Coming       *Coming `json:"coming,omitempty"`
+	Motion       *Motion `json:"motion,omitempty"`
+}
+
+// specialTypes are airframes rare almost anywhere, by ICAO type designator. Rarity at home (what is unusual over this
+// street) comes from the history in M4; this list covers the obvious cases until then.
+var specialTypes = map[string]string{
+	"A124": "Antonov An-124 Ruslan",
+	"A225": "Antonov An-225 Mriya",
+	"AN22": "Antonov An-22",
+	"A3ST": "Airbus Beluga",
+	"A337": "Airbus BelugaXL",
+	"BLCF": "Boeing 747 Dreamlifter",
+	"SGUP": "Super Guppy",
+	"B52":  "Boeing B-52 Stratofortress",
+	"C5M":  "Lockheed C-5M Super Galaxy",
+	"A400": "Airbus A400M Atlas",
+	"CONC": "Concorde",
+}
+
+// notable says why an aircraft deserves the banner, most urgent first, or "" if it doesn't.
+func notable(p feeds.Position) string {
+	switch p.Squawk {
+	case "7500":
+		return "Squawking 7500: unlawful interference"
+	case "7600":
+		return "Squawking 7600: radio failure"
+	case "7700":
+		return "Squawking 7700: emergency"
+	}
+	if p.Emergency != "" {
+		return "Declared emergency: " + p.Emergency
+	}
+	if name, ok := specialTypes[p.TypeCode]; ok {
+		return "Rare visitor: " + name
+	}
+	if p.Military {
+		return "Military aircraft"
+	}
+	return ""
 }
 
 // View is the picture at one moment.
@@ -131,6 +188,7 @@ type View struct {
 	At       time.Time `json:"at"`
 	Center   LatLon    `json:"center"`
 	RadiusKm float64   `json:"radius_km"`
+	Window   Window    `json:"window"`
 	Planes   []Plane   `json:"planes"` // nearest first
 	// Today counts distinct aircraft seen since local midnight.
 	Today int `json:"today"`
@@ -157,7 +215,11 @@ func (s *State) View(now time.Time) View {
 		maxAge = DefaultMaxAge
 	}
 	s.prune(now)
-	v := View{At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Planes: []Plane{}, Sources: []string{}}
+	w := s.Window.normalised()
+	v := View{
+		At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Window: w,
+		Planes: []Plane{}, Sources: []string{},
+	}
 	sources := make(map[string]bool)
 	for hex, p := range s.pos {
 		if now.Sub(p.At) > maxAge {
@@ -171,6 +233,7 @@ func (s *State) View(now time.Time) View {
 			Position:   p,
 			DistanceKm: geo.DistanceKm(s.Center, p.Point()),
 			BearingDeg: geo.BearingDeg(s.Center, p.Point()),
+			Notable:    notable(p),
 		}
 		if info, ok := s.info[hex]; ok {
 			if info.Route != nil && info.Route.Callsign != p.Callsign {
@@ -178,6 +241,18 @@ func (s *State) View(now time.Time) View {
 			}
 			pl.Info = &info
 			pl.ToDestinationKm, pl.ETAMin = eta(p, info.Route)
+		}
+		// Placed where it should be now, not where it was last reported: the report may be several seconds old.
+		age := reportAge(p, now)
+		if pt, h, ok := project(p, age); ok {
+			sg := w.sight(s.Center, pt, h)
+			pl.ElevationDeg, pl.OffsetDeg, pl.InView = sg.elevation, sg.offset, w.sees(sg)
+			pl.Motion = w.motion(s.Center, p, age, sg)
+			if !pl.InView {
+				pl.Coming = w.coming(s.Center, p, now)
+			}
+		} else {
+			pl.OffsetDeg = geo.AngleDiff(pl.BearingDeg, w.AzimuthDeg)
 		}
 		v.Planes = append(v.Planes, pl)
 		sources[p.Source] = true
@@ -198,6 +273,7 @@ func (s *State) View(now time.Time) View {
 	if now.Local().Format(time.DateOnly) == s.day {
 		v.Today = len(s.today)
 	}
+	s.trackPredictions(v)
 	return v
 }
 

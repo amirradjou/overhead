@@ -36,4 +36,34 @@ func BearingDeg(from, to Point) float64 {
 	return math.Mod(math.Atan2(y, x)*180/math.Pi+360, 360)
 }
 
+// Destination is the point reached from start by travelling distKm along the initial bearing bearingDeg.
+func Destination(start Point, bearingDeg, distKm float64) Point {
+	lat1, lon1, brg := rad(start.Lat), rad(start.Lon), rad(bearingDeg)
+	d := distKm / earthRadiusKm
+	lat2 := math.Asin(math.Sin(lat1)*math.Cos(d) + math.Cos(lat1)*math.Sin(d)*math.Cos(brg))
+	lon2 := lon1 + math.Atan2(math.Sin(brg)*math.Sin(d)*math.Cos(lat1), math.Cos(d)-math.Sin(lat1)*math.Sin(lat2))
+	return Point{Lat: deg(lat2), Lon: math.Mod(deg(lon2)+540, 360) - 180}
+}
+
+// refractedRadiusKm is the Earth's radius as light sees it: standard atmospheric refraction bends sight lines round
+// the curve, which is the same as a flatter Earth with four thirds the radius.
+const refractedRadiusKm = earthRadiusKm * 4 / 3
+
+// ElevationDeg is the angle above the horizon at which something heightKm above the observer is seen from distKm
+// away along the ground, allowing for the Earth's curve.
+func ElevationDeg(heightKm, distKm float64) float64 {
+	if distKm <= 0 {
+		return 90
+	}
+	drop := distKm * distKm / (2 * refractedRadiusKm)
+	return deg(math.Atan2(heightKm-drop, distKm))
+}
+
+// AngleDiff is the signed difference a-b between two bearings, from -180 up to 180.
+func AngleDiff(a, b float64) float64 {
+	return math.Mod(a-b+540, 360) - 180
+}
+
 func rad(deg float64) float64 { return deg * math.Pi / 180 }
+
+func deg(rad float64) float64 { return rad * 180 / math.Pi }

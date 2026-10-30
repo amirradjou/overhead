@@ -71,7 +71,8 @@ func addCircleFlags(fs *flag.FlagSet) (*circle, error) {
 	}
 	fs.Float64Var(&c.center.Lat, "lat", c.center.Lat, "latitude of the centre (OVERHEAD_LAT)")
 	fs.Float64Var(&c.center.Lon, "lon", c.center.Lon, "longitude of the centre (OVERHEAD_LON)")
-	fs.Float64Var(&c.radius, "radius", 30, "radius in km")
+	// 60 km sees a plane a few minutes before it reaches the window (README: Poller).
+	fs.Float64Var(&c.radius, "radius", 60, "radius in km")
 	return c, nil
 }
 
@@ -131,6 +132,19 @@ func (p *pollSettings) poller(cmd string) (*poller.Poller, error) {
 		return nil, usageError{"overhead " + cmd + ": -feeds is empty"}
 	}
 	return &poller.Poller{Feeds: fl, Spacing: spacing, Center: p.center, RadiusKm: p.radius, Interval: p.interval}, nil
+}
+
+// envFloat reads a number from the environment, or returns fallback when the variable is unset.
+func envFloat(name string, fallback float64) (float64, error) {
+	s := strings.TrimSpace(os.Getenv(name))
+	if s == "" {
+		return fallback, nil
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s=%q is not a number", name, s)
+	}
+	return f, nil
 }
 
 func envCenter() (geo.Point, error) {

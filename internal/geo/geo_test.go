@@ -50,6 +50,48 @@ func TestBearingDeg(t *testing.T) {
 	}
 }
 
+func TestDestination(t *testing.T) {
+	for _, tt := range []struct {
+		bearing, km float64
+	}{{0, 10}, {90, 25}, {225, 60}, {359, 3}} {
+		p := Destination(pearson, tt.bearing, tt.km)
+		if d := DistanceKm(pearson, p); math.Abs(d-tt.km) > 0.01 {
+			t.Errorf("Destination(%v°, %v km) is %.3f km away", tt.bearing, tt.km, d)
+		}
+		if b := BearingDeg(pearson, p); math.Abs(AngleDiff(b, tt.bearing)) > 0.1 {
+			t.Errorf("Destination(%v°, %v km) lies at %.2f°", tt.bearing, tt.km, b)
+		}
+	}
+}
+
+func TestElevationDeg(t *testing.T) {
+	tests := []struct {
+		name           string
+		heightKm, dist float64
+		want           float64
+	}{
+		{"straight up", 1, 0, 90},
+		{"45 degrees", 1, 1, 45},
+		// 10,000 ft (3.05 km) at 30 km: atan(3.05/30) is 5.8°, less about 0.1° for the curve.
+		{"10,000 ft at 30 km", 3.048, 30, 5.7},
+		// A plane on the ground 40 km away is below the horizon.
+		{"ground at 40 km", 0, 40, -0.1},
+	}
+	for _, tt := range tests {
+		if got := ElevationDeg(tt.heightKm, tt.dist); math.Abs(got-tt.want) > 0.06 {
+			t.Errorf("%s: ElevationDeg = %.3f, want %.1f", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestAngleDiff(t *testing.T) {
+	for _, tt := range []struct{ a, b, want float64 }{{10, 350, 20}, {350, 10, -20}, {180, 0, -180}, {90, 90, 0}} {
+		if got := AngleDiff(tt.a, tt.b); got != tt.want {
+			t.Errorf("AngleDiff(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
 func TestValid(t *testing.T) {
 	if !pearson.Valid() {
 		t.Fatal("Pearson should be valid")

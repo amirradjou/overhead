@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+	_ "time/tzdata" // OVERHEAD_TZ must load in a container without a zoneinfo directory
 
 	"github.com/amirradjou/overhead/internal/buildinfo"
 )
@@ -29,9 +31,22 @@ environment:
   OVERHEAD_LAT, OVERHEAD_LON   the centre of the circle (default: Toronto Pearson)
   OVERHEAD_AMQP                RabbitMQ (default amqp://overhead:overhead@localhost:5673/, compose.yaml)
   OVERHEAD_DATA                where enrich and history keep their files (default ./data)
+  OVERHEAD_TZ                  the time zone of "today", e.g. America/Toronto (default: the system's)
+  OVERHEAD_WINDOW_AZ, _FOV, _MIN_EL, OVERHEAD_HOME_ELEV
+                               the window the screen draws (live; default: all round, down to 5°)
 `
 
 func main() {
+	// "Today" (the screen's count, facts, a heads-up's once a day) is a day where the window is, not where the
+	// server's clock happens to be set: a container runs in UTC.
+	if tz := env("OVERHEAD_TZ", ""); tz != "" {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "overhead: OVERHEAD_TZ=%q: %v\n", tz, err)
+			os.Exit(2)
+		}
+		time.Local = loc
+	}
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
