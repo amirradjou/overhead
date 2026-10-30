@@ -1,53 +1,115 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { label } from "@/lib/format";
-import { compassTicks, roofline, rooftops, stars, toScreen, topDeg } from "@/lib/sky";
-import type { SkyPhase } from "@/lib/sun";
+import {
+  compassTicks,
+  inFrame,
+  nearestTurn,
+  offsetFrom,
+  roofline,
+  rooftops,
+  toScreen,
+  screenTop,
+} from "@/lib/sky";
+import { sunGlow } from "@/lib/skyColour";
+import { magnitudeLimit, starColour, starsAbove } from "@/lib/stars";
+import { moonAt, moonPath, type SkyPhase } from "@/lib/sun";
 import type { Plane, View, Window } from "@/lib/types";
 
 interface Props {
   view: View | null;
+  now: Date | null;
   phase: SkyPhase;
+  sun: { alt: number; az: number } | null;
   featuredHex?: string;
   next?: Plane;
 }
 
 const trailPoints = 15; // 30 s of positions at one snapshot every 2 s
 
-// The window: sky, stars after dark, the rooftops opposite, the planes in view and a cue where the next one appears.
-export default function Sky({ view, phase, featuredHex, next }: Props) {
+// The window: the sky as it is outside (the light round the sun, the real stars and the moon where they are), the
+// rooftops opposite, the planes in view and a cue where the next one appears.
+export default function Sky({ view, now, phase, sun, featuredHex, next }: Props) {
   const roofs = useMemo(() => rooftops(), []);
-  const starField = useMemo(() => stars(160), []);
-  const w = view?.window;
+  // A new window object arrives with every snapshot; the same window, the same object, so the sky is not redone.
+  const snapshotWindow = view?.window;
+  const w = useMemo(
+    () => snapshotWindow,
+    [snapshotWindow?.azimuth_deg, snapshotWindow?.fov_deg, snapshotWindow?.min_elevation_deg],
+  );
+  const lat = view?.center.lat;
+  const lon = view?.center.lon;
   const visible = useMemo(() => view?.planes.filter((p) => p.in_view) ?? [], [view]);
   const trails = useTrails(visible, w);
+  const size = useScreenSize();
   const dark = phase === "night" || phase === "twilight";
+
+  // The heavens move slowly: worked out again only when the clock (every 20 s) or the window changes.
+  const heavens = useMemo(() => {
+    if (!w || !now || lat === undefined || lon === undefined || !sun) return null;
+    const stars = starsAbove(lat, lon, now, magnitudeLimit(sun.alt)).flatMap((st) => {
+      const off = offsetFrom(w, st.az);
+      return inFrame(w, off, st.alt) ? [{ ...toScreen(w, off, st.alt), mag: st.mag, bv: st.bv }] : [];
+    });
+    const m = moonAt(lat, lon, now);
+    const moonOff = offsetFrom(w, m.az);
+    const moon = inFrame(w, moonOff, m.alt) ? { ...m, ...toScreen(w, moonOff, m.alt) } : null;
+    const sunOff = offsetFrom(w, sun.az);
+    const sunY = sun.alt > w.min_elevation_deg ? toScreen(w, sunOff, sun.alt).y : roofline;
+    return { stars, moon, glow: sunGlow(sun.alt, sunOff, w.fov_deg, sunY), limit: magnitudeLimit(sun.alt) };
+  }, [w, now, lat, lon, sun]);
+  const scale = size ? size.height / 1080 : 1;
 
   return (
     <div className="sky" aria-hidden="true">
-      {dark && (
-        <svg className="stars" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-          {starField.map((s, i) => (
-            <circle key={i} cx={s.x * 1000} cy={s.y * 1000} r={s.r} opacity={s.a} />
+      {heavens?.glow && (
+        <div
+          className="sun-glow"
+          style={{
+            left: `${heavens.glow.x * 100}%`,
+            top: `${heavens.glow.y * 100}%`,
+            opacity: heavens.glow.opacity,
+            background: `radial-gradient(closest-side, ${heavens.glow.colour}, transparent)`,
+          }}
+        />
+      )}
+      {heavens && heavens.stars.length > 0 && (
+        // No viewBox: positions in percent, radii in pixels, so a star is round on any screen shape.
+        <svg className="stars">
+          {heavens.stars.map((st, i) => (
+            <circle
+              key={i}
+              cx={`${(st.x * 100).toFixed(2)}%`}
+              cy={`${(st.y * 100).toFixed(2)}%`}
+              r={(Math.min(2.8, Math.max(1.05, 2.4 - 0.3 * st.mag)) * scale).toFixed(2)}
+              fill={starColour(st.bv)}
+              opacity={Math.min(1, Math.max(0.3, 0.45 + (heavens.limit - st.mag) * 0.18)).toFixed(2)}
+            />
           ))}
         </svg>
       )}
+      {heavens?.moon && <MoonDisc moon={heavens.moon} dark={dark} />}
       {w && (
         <svg className="trails" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+          {/* Up to where the plane was at the last snapshot: it glides on from there, so the trail follows it. */}
           {[...trails].map(([hex, pts]) => (
             <polyline
               key={hex}
               className={hex === featuredHex ? "trail is-featured" : "trail"}
-              points={pts.map((p) => `${(p.x * 1000).toFixed(1)},${(p.y * 1000).toFixed(1)}`).join(" ")}
+              points={pts
+                .slice(0, -1)
+                .map((p) => `${(p.x * 1000).toFixed(1)},${(p.y * 1000).toFixed(1)}`)
+                .join(" ")}
               vectorEffect="non-scaling-stroke"
             />
           ))}
         </svg>
       )}
       {w &&
+        size &&
         visible.map((p) => (
-          <Craft key={p.hex} plane={p} w={w} dark={dark} featured={p.hex === featuredHex} />
+          <Craft key={p.hex} plane={p} w={w} size={size} dark={dark} featured={p.hex === featuredHex} />
         ))}
       {w && next?.coming && <Cue plane={next} w={w} />}
       <svg className="roofs" viewBox="0 0 1000 1000" preserveAspectRatio="none">
@@ -62,6 +124,32 @@ export default function Sky({ view, phase, featuredHex, next }: Props) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// MoonDisc is the moon where it stands in the window, lit on the side that faces the sun, as seen from home. It is
+// drawn larger than life (the real one is half a degree, a few pixels here), as the eye remembers it.
+function MoonDisc({
+  moon,
+  dark,
+}: {
+  moon: { x: number; y: number; fraction: number; limbDeg: number };
+  dark: boolean;
+}) {
+  return (
+    <div
+      className={`moon${dark ? " is-night" : ""}`}
+      style={{ left: `${moon.x * 100}%`, top: `${moon.y * 100}%` }}
+    >
+      <svg viewBox="-1 -1 2 2">
+        <circle className="moon-dark" r={1} />
+        <path
+          className="moon-lit"
+          d={moonPath(moon.fraction, 1)}
+          transform={`rotate(${(-moon.limbDeg).toFixed(1)})`}
+        />
+      </svg>
     </div>
   );
 }
@@ -83,15 +171,40 @@ function useTrails(visible: Plane[], w: Window | undefined) {
   return trails;
 }
 
+// useScreenSize is the screen's size in pixels, for placing planes with transforms; null until the page runs.
+function useScreenSize(): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const measure = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  return size;
+}
+
+interface CraftProps {
+  plane: Plane;
+  w: Window;
+  size: { width: number; height: number };
+  dark: boolean;
+  featured: boolean;
+}
+
 // Craft is one plane in view: its navigation lights after dark, a silhouette by day, pointing the way it moves.
-function Craft({ plane, w, dark, featured }: { plane: Plane; w: Window; dark: boolean; featured: boolean }) {
+// It is placed with a transform and glides there by transition, which the compositor runs: no layout per frame.
+function Craft({ plane, w, size, dark, featured }: CraftProps) {
   const pos = toScreen(w, plane.offset_deg, plane.elevation_deg);
+  const angle = useRef<number | null>(null);
+  angle.current = nearestTurn(angle.current ?? 0, screenAngle(plane, w));
+  const x = (pos.x * size.width).toFixed(1);
+  const y = (pos.y * size.height).toFixed(1);
   return (
     <div
-      className={`craft${featured ? " is-featured" : ""}`}
-      style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+      className={`craft${featured ? " is-featured" : ""}${pos.x > 0.8 ? " label-left" : ""}`}
+      style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
     >
-      <div className="craft-body" style={{ transform: `rotate(${screenAngle(plane, w)}deg)` }}>
+      <div className="craft-body" style={{ transform: `rotate(${angle.current}deg)` }}>
         {dark ? (
           <>
             {/* Seen from below, the left (red) wing of a plane flying right is the one farther away: higher up. */}
@@ -115,10 +228,21 @@ function Cue({ plane, w }: { plane: Plane; w: Window }) {
   const c = plane.coming;
   if (!c) return null;
   const at = toScreen(w, c.offset_deg, c.elevation_deg);
-  const x = c.side === "left" ? 0.015 : c.side === "right" ? 0.985 : Math.min(0.95, Math.max(0.05, at.x));
-  const y = c.side === "rooftops" ? roofline - 0.04 : c.side === "above" ? 0.04 : Math.max(0.06, at.y);
+  // At the edge it comes from, inside the TV-safe area so an overscanning TV cannot crop it.
+  const left =
+    c.side === "left"
+      ? "var(--safe-x)"
+      : c.side === "right"
+        ? "calc(100% - var(--safe-x))"
+        : `${Math.min(0.85, Math.max(0.15, at.x)) * 100}%`;
+  const top =
+    c.side === "rooftops"
+      ? `${(roofline - 0.04) * 100}%`
+      : c.side === "above"
+        ? "calc(var(--safe-y) + 1rem)"
+        : `${Math.max(0.1, at.y) * 100}%`; // below the safe top margin; CSS max() needs Chromium 79
   return (
-    <div className={`cue cue-${c.side}`} style={{ left: `${x * 100}%`, top: `${y * 100}%` }}>
+    <div className={`cue cue-${c.side}`} style={{ left, top }}>
       <span className="cue-mark" />
       <span className="cue-text">
         {label(plane)} {c.in_s < 45 ? "any moment" : `in ${Math.round(c.in_s / 60)} min`}
@@ -131,7 +255,7 @@ function Cue({ plane, w }: { plane: Plane; w: Window }) {
 function screenAngle(p: Plane, w: Window): number {
   if (!p.motion) return 0;
   const dx = p.motion.offset_deg / w.fov_deg; // screen widths
-  const dy = ((-p.motion.elevation_deg / (topDeg - w.min_elevation_deg)) * roofline * 9) / 16; // in widths, 16:9
+  const dy = ((-p.motion.elevation_deg / (screenTop(w) - w.min_elevation_deg)) * roofline * 9) / 16; // in widths, 16:9
   return (Math.atan2(dy, dx) * 180) / Math.PI;
 }
 

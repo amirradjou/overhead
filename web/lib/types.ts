@@ -42,6 +42,8 @@ export interface Window {
   azimuth_deg: number;
   fov_deg: number;
   min_elevation_deg: number;
+  /** The window's top edge as seen from where you sit; 90 means none. Older servers leave it out. */
+  max_elevation_deg?: number;
   home_elevation_m: number;
 }
 

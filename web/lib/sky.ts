@@ -2,8 +2,14 @@
 // the horizon, from the lowest angle visible over the rooftops to the top of the screen.
 import type { Window } from "./types";
 
-/** The highest angle drawn; anything above it sits at the top edge, as it would at the top of a window frame. */
+/** The highest angle drawn for a window without a top edge; anything above it sits at the top of the screen. */
 export const topDeg = 70;
+
+/** The angle at the top of the screen: the window's top edge, or topDeg when it has none (or a higher one). */
+export function screenTop(w: Window): number {
+  const edge = w.max_elevation_deg;
+  return edge !== undefined && edge > w.min_elevation_deg && edge < topDeg ? edge : topDeg;
+}
 
 /** Where the rooftops end and the sky begins, as a fraction of the screen's height from the top. */
 export const roofline = 0.72;
@@ -11,9 +17,32 @@ export const roofline = 0.72;
 /** Screen position, each 0 to 1, of something seen offsetDeg right of the window's centre and elevationDeg up. */
 export function toScreen(w: Window, offsetDeg: number, elevationDeg: number): { x: number; y: number } {
   const x = 0.5 + offsetDeg / w.fov_deg;
-  const up = (elevationDeg - w.min_elevation_deg) / (topDeg - w.min_elevation_deg);
+  const up = (elevationDeg - w.min_elevation_deg) / (screenTop(w) - w.min_elevation_deg);
   const y = roofline * (1 - Math.min(1, Math.max(0, up)));
   return { x: Math.min(1, Math.max(0, x)), y };
+}
+
+/**
+ * The angle to turn to, as close to prev as it can be: next plus or minus whole turns. A plane flying right to left
+ * points at about ±180°, and a heading that wobbles across that line must turn a few degrees, not spin round.
+ */
+export function nearestTurn(prev: number, next: number): number {
+  return prev + ((((next - prev) % 360) + 540) % 360) - 180;
+}
+
+/** How far right of the window's centre something at azimuth azDeg is, in degrees from -180 to 180. */
+export function offsetFrom(w: Window, azDeg: number): number {
+  return ((((azDeg - w.azimuth_deg) % 360) + 540) % 360) - 180;
+}
+
+/** Whether something offsetDeg right of the window's centre and elevationDeg up is in the frame: over the roofs, below
+ * the top edge and between the sides. */
+export function inFrame(w: Window, offsetDeg: number, elevationDeg: number): boolean {
+  return (
+    Math.abs(offsetDeg) <= w.fov_deg / 2 &&
+    elevationDeg >= w.min_elevation_deg &&
+    elevationDeg <= screenTop(w)
+  );
 }
 
 /** The compass points across the window, with their screen position. */
@@ -29,7 +58,21 @@ export function compassTicks(w: Window): { label: string; x: number }[] {
   return ticks;
 }
 
-/** A small seeded random generator (mulberry32), so stars and rooftops come out the same on every load. */
+/**
+ * How far to turn the overview disc so the window's direction is at the top: the window's azimuth, or none for a
+ * window that sees all round (north up, as a map would be).
+ */
+export function overviewTurn(w: Window): number {
+  return w.fov_deg >= 360 ? 0 : w.azimuth_deg;
+}
+
+/** A point at a compass angle (clockwise from the top) and a distance from the centre, in SVG's y-down space. */
+export function polar(deg: number, d: number): { x: number; y: number } {
+  const a = (deg * Math.PI) / 180;
+  return { x: d * Math.sin(a), y: -d * Math.cos(a) };
+}
+
+/** A small seeded random generator (mulberry32), so the rooftops come out the same on every load. */
 export function seeded(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -46,31 +89,31 @@ export function seeded(seed: number): () => number {
  * most, never above it, because the roofline is the lowest angle the window sees over them.
  */
 export function rooftops(seed = 7): string {
+  const bleed = 40;
   const rand = seeded(seed);
   const top = roofline * 1000;
-  let x = 0;
-  let d = `M0 1000 L0 ${top + 40}`;
-  while (x < 1000) {
+  // One closed outline, left to right along the roofs: a chimney is a detour up and down within it, never a new
+  // sub-path, or the fill breaks apart.
+  // The outline runs a little past the box on every side, so the drift against burn-in never shows an edge.
+  const pts: [number, number][] = [
+    [-bleed, 1000 + bleed],
+    [-bleed, top + 40],
+  ];
+  let x = -bleed;
+  while (x < 1000 + bleed) {
     const width = 25 + rand() * 70;
     const drop = rand() < 0.25 ? rand() * 70 : rand() * 18; // most buildings near the line, a few lower ones
     const y = top + drop;
-    d += ` L${x.toFixed(1)} ${y.toFixed(1)} L${Math.min(1000, x + width).toFixed(1)} ${y.toFixed(1)}`;
+    const x2 = Math.min(1000 + bleed, x + width);
+    pts.push([x, y]);
     if (rand() < 0.15) {
       const cx = x + width * (0.2 + rand() * 0.5); // a chimney or a mast
-      d += ` M${cx.toFixed(1)} ${y.toFixed(1)} L${cx.toFixed(1)} ${(y - 6 - rand() * 10).toFixed(1)} L${(cx + 4).toFixed(1)} ${(y - 6).toFixed(1)} L${(cx + 4).toFixed(1)} ${y.toFixed(1)} M${Math.min(1000, x + width).toFixed(1)} ${y.toFixed(1)}`;
+      const h = 6 + rand() * 10;
+      pts.push([cx, y], [cx, y - h], [cx + 4, y - h], [cx + 4, y]);
     }
-    x += width;
+    pts.push([x2, y]);
+    x = x2;
   }
-  return `${d} L1000 1000 Z`;
-}
-
-/** Stars for a night sky: positions above the roofline and a brightness each. */
-export function stars(count: number, seed = 11): { x: number; y: number; a: number; r: number }[] {
-  const rand = seeded(seed);
-  return Array.from({ length: count }, () => ({
-    x: rand(),
-    y: rand() * roofline * 0.95,
-    a: 0.25 + rand() * 0.6,
-    r: rand() < 0.08 ? 1.6 : 0.9,
-  }));
+  pts.push([1000 + bleed, 1000 + bleed]);
+  return "M" + pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" L") + " Z";
 }

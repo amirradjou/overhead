@@ -3,3 +3,4 @@ out
 node_modules
 pnpm-lock.yaml
 next-env.d.ts
+lib/bright-stars.json

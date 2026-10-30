@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { compassTicks, roofline, rooftops, seeded, stars, toScreen, topDeg } from "./sky";
+import {
+  compassTicks,
+  inFrame,
+  nearestTurn,
+  offsetFrom,
+  overviewTurn,
+  polar,
+  roofline,
+  rooftops,
+  seeded,
+  toScreen,
+  screenTop,
+  topDeg,
+} from "./sky";
 import { skyPhase, sunElevation } from "./sun";
 import type { Window } from "./types";
 
@@ -27,13 +40,48 @@ describe("the window on screen", () => {
     expect(round.find((t) => t.label === "S")?.x).toBe(1);
   });
 
-  it("draws the same rooftops and stars every time, never above the roofline", () => {
+  it("turns the overview so the window faces up, north wherever it falls", () => {
+    expect(overviewTurn(south)).toBe(180);
+    expect(overviewTurn(allRound)).toBe(0);
+    // Facing south, a plane due south of home is straight up the disc and north is at the bottom.
+    const up = polar(180 - overviewTurn(south), 10);
+    expect(up.x).toBeCloseTo(0);
+    expect(up.y).toBeCloseTo(-10);
+    const north = polar(0 - overviewTurn(south), 10);
+    expect(north.y).toBeCloseTo(10);
+    // Facing south-south-west (200°), a plane due west (270°) is 70° right of the top.
+    const west = polar(270 - 200, 10);
+    expect(west.x).toBeGreaterThan(0);
+    expect(west.y).toBeLessThan(0);
+  });
+
+  it("turns a plane the short way round", () => {
+    expect(nearestTurn(179, -179)).toBe(181);
+    expect(nearestTurn(-170, 170)).toBe(-190);
+    expect(nearestTurn(725, 10)).toBe(730);
+    expect(nearestTurn(0, 90)).toBe(90);
+    expect(nearestTurn(0, -90)).toBe(-90);
+  });
+
+  it("knows what the window frames", () => {
+    expect(offsetFrom(south, 180)).toBe(0);
+    expect(offsetFrom(south, 225)).toBe(45);
+    expect(offsetFrom(south, 90)).toBe(-90);
+    expect(offsetFrom(allRound, 350)).toBe(-10);
+    expect(inFrame(south, 44, 30)).toBe(true);
+    expect(inFrame(south, 46, 30)).toBe(false);
+    expect(inFrame(south, 0, 4)).toBe(false); // behind the roofs
+    expect(inFrame(south, 0, topDeg + 1)).toBe(false); // above the top of the frame
+  });
+
+  it("draws the same rooftops every time, never above the roofline", () => {
     expect(rooftops()).toBe(rooftops());
-    const tops = [...rooftops().matchAll(/L[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
+    const path = rooftops();
+    const tops = [...path.matchAll(/[\d.]+,([\d.]+)/g)].map((m) => Number(m[1]));
     expect(Math.min(...tops)).toBeGreaterThanOrEqual(roofline * 1000 - 16); // chimneys poke up a little
-    const s = stars(50);
-    expect(s).toEqual(stars(50));
-    expect(s.every((st) => st.y < roofline)).toBe(true);
+    // One outline: a single move, closed at the end, so the fill can't come apart.
+    expect(path.match(/M/g)).toHaveLength(1);
+    expect(path.endsWith("Z")).toBe(true);
     const r = seeded(1);
     expect(r()).not.toBe(r());
   });
@@ -53,5 +101,27 @@ describe("the sun over Toronto", () => {
     expect(skyPhase(-3)).toBe("twilight");
     expect(skyPhase(4)).toBe("golden");
     expect(skyPhase(30)).toBe("day");
+  });
+});
+
+describe("a window with a top edge", () => {
+  const framed: Window = {
+    azimuth_deg: 180,
+    fov_deg: 90,
+    min_elevation_deg: 5,
+    max_elevation_deg: 40,
+    home_elevation_m: 0,
+  };
+  it("puts the top edge at the top of the screen, and nothing above it in the frame", () => {
+    expect(screenTop(framed)).toBe(40);
+    expect(toScreen(framed, 0, 40).y).toBe(0);
+    expect(toScreen(framed, 0, 22.5).y).toBeCloseTo(roofline / 2);
+    expect(inFrame(framed, 0, 41)).toBe(false);
+    expect(inFrame(framed, 0, 39)).toBe(true);
+  });
+  it("falls back to the usual top without an edge, or with none worth drawing", () => {
+    expect(screenTop({ ...framed, max_elevation_deg: 90 })).toBe(topDeg);
+    expect(screenTop({ ...framed, max_elevation_deg: undefined })).toBe(topDeg);
+    expect(screenTop({ ...framed, max_elevation_deg: 3 })).toBe(topDeg);
   });
 });

@@ -4,17 +4,20 @@ import {
   altitude,
   arrival,
   direction,
+  flightFacts,
   flightName,
   fromTo,
   label,
   landing,
   operator,
   photoCredit,
+  sourceHomes,
   speed,
   trend,
+  webLink,
   whereFromHome,
 } from "./format";
-import { comingNext, inView } from "./pick";
+import { comingNext, inView, rotating } from "./pick";
 import type { Plane } from "./types";
 
 function plane(over: Partial<Plane> = {}): Plane {
@@ -51,7 +54,44 @@ const porter = plane({
   },
 });
 
+describe("credits", () => {
+  it("links every source to its home page", () => {
+    expect(sourceHomes["adsb.fi"]).toBe("https://adsb.fi");
+    expect(sourceHomes["adsb.lol"]).toBe("https://adsb.lol");
+    expect(sourceHomes["adsbdb"]).toBe("https://www.adsbdb.com");
+  });
+
+  it("follows only web links from the feeds", () => {
+    expect(webLink("https://www.planespotters.net/photo/123")).toBe(
+      "https://www.planespotters.net/photo/123",
+    );
+    expect(webLink("javascript:alert(1)")).toBeUndefined();
+    expect(webLink("data:text/html,hi")).toBeUndefined();
+    expect(webLink(undefined)).toBeUndefined();
+  });
+});
+
 describe("format", () => {
+  it("says what the plane is doing in one sentence", () => {
+    const max = {
+      type_code: "B38M",
+      info: { hex: "c0ffee", type_name: "737 MAX 8", manufacturer: "Boeing" },
+    };
+    expect(flightFacts(plane({ ...max, alt_ft: 9800, vert_rate_fpm: -1200, speed_kt: 280 }))).toBe(
+      "Boeing 737 MAX 8, descending through 9,800 ft at 520 km/h",
+    );
+    expect(flightFacts(plane({ ...max, alt_ft: 36000, vert_rate_fpm: 0, speed_kt: 460 }))).toBe(
+      "Boeing 737 MAX 8, level at 36,000 ft, 850 km/h",
+    );
+    expect(flightFacts(plane({ ...max, alt_ft: 4100 }))).toBe("Boeing 737 MAX 8 at 4,100 ft");
+    expect(flightFacts(plane({ alt_ft: 4100, vert_rate_fpm: 1800, speed_kt: 220 }))).toBe(
+      "Climbing through 4,100 ft at 405 km/h",
+    );
+    expect(flightFacts(plane({ ...max, on_ground: true }))).toBe("Boeing 737 MAX 8, on the ground");
+    expect(flightFacts(plane({ speed_kt: 220 }))).toBe("405 km/h");
+    expect(flightFacts(plane())).toBe("");
+  });
+
   it("writes altitude, trend and speed for a living room", () => {
     const p = plane({ alt_ft: 9712, vert_rate_fpm: -1408, speed_kt: 327.4 });
     expect(altitude(p)).toBe("9,700 ft");
@@ -116,5 +156,15 @@ describe("pick", () => {
 
   it("lists what is coming, soonest first, without what is already in view", () => {
     expect(comingNext([later, low, soon, away]).map((p) => p.hex)).toEqual(["c", "d"]);
+  });
+});
+
+describe("rotating", () => {
+  it("takes turns on the clock", () => {
+    expect(rotating(["a", "b", "c"], new Date(0), 20_000)).toBe("a");
+    expect(rotating(["a", "b", "c"], new Date(45_000), 20_000)).toBe("c");
+    expect(rotating(["a", "b", "c"], new Date(60_000), 20_000)).toBe("a");
+    expect(rotating([], new Date(0), 20_000)).toBeUndefined();
+    expect(rotating(["a"], null, 20_000)).toBeUndefined();
   });
 });

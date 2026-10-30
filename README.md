@@ -59,15 +59,16 @@ Coverage is what the volunteer receivers see — excellent around Toronto Pearso
    Pearson is landing (so which side planes come from). Counted from the passes by flight number, never by route
    (adsbdb's routes may not be stored). A fact appears only once the history backs it.
 6. **Screen (Next.js)** — the window view, made to be left on. The sky through your window, drawn to match what you
-   see (the window's direction, width and lowest visible angle are settings); each plane where you would see it; the
-   one in view named in large type (airline, from and to, aircraft, altitude, speed, a photo of that airframe); the
-   next one coming, with a countdown and the side it will appear from; a small overview of everything around; a fact
-   between planes. Calm by design: slow motion, dimmer at night, a slight drift over time so nothing burns into a TV,
-   and days of running without a reload in a TV browser. Readable from the sofa: no text under 23 px at 1080p, every
-   label at least 4.5:1 against the sky behind it, all text inside a 5% safe area. When nothing is coming, the sky is
-   the content: the sun, the moon and its phase, the bright stars and planets where they really are, and a fact; when
-   cloud hides the planes it says so; late at night with nothing flying it dims nearly to black. The small overview
-   is turned to the window (its direction at the top), not to north.
+   see (the window's direction, width and lowest and highest visible angles are settings): its colour follows the
+   sun, and the moon and the brightest stars are drawn where they stand. Each plane where you would see it; the one in
+   view named in large type (airline, from and to with how far along the trip it is, aircraft, altitude, speed, a
+   photo of that airframe) and a fact about its type; the next one coming, with a countdown and the side it will
+   appear from; a small overview of everything around, turned to the window (its direction at the top), not to
+   north; between planes, a fact from the history, the next sunrise or sunset and the moon. Calm by design: slow
+   motion, dimmer at night, a slight drift of the whole scene so nothing burns into a TV, and days of running without
+   a reload in a TV browser as old as Chromium 79. Readable from the sofa: no text under 23 px at 1080p, every label
+   at least 4.5:1 against the sky behind it, all text inside a 5% safe area. Still to come: the planets, saying so
+   when cloud hides the planes, and dimming nearly to black late at night when nothing is flying.
 7. **Heads-up** — consumes the alerts queue: an optional message on the phone (Telegram) when something worth
    getting up for is about to pass the window: a rare type, an unusually low pass, an emergency squawk
    (7500/7600/7700), a first-ever visitor. Each is sent once, with no duplicates.
@@ -148,6 +149,18 @@ export OVERHEAD_WINDOW_MIN_EL=8                 # over rooftops 8 degrees high
 export OVERHEAD_WINDOW_MAX_EL=40                # up to the window's top edge, 40 degrees, as seen from the sofa
 export OVERHEAD_TZ=America/Toronto              # "today" where the window is (a container runs in UTC)
 ./bin/overhead live -web web/out                # open http://<this machine>:8090 on the TV
+```
+
+TV browsers are old: webOS 6 runs Chromium 79, and Samsung's 2021 sets Chromium 76. `pnpm screen-check` opens the
+built screen in the Chromium you name, against a made-up live feed, at night, under the moon, by day, at golden hour
+and at twilight. It saves a screenshot of each and fails on script errors, layout work while planes move, text
+smaller than 23 px at 1080p or text outside the TV-safe area:
+
+```sh
+npx @puppeteer/browsers install chromium@706915 --path ~/.cache/screen-check   # Chromium 79, once
+export CHROME=~/.cache/screen-check/chromium/linux-706915/chrome-linux/chrome
+(cd web && pnpm build && pnpm screen-check --no-sandbox)   # screenshots in web/screen-check/
+(cd web && node scripts/screen-check.mjs --serve 3999)  # the made-up feed alone, for a browser by hand
 ```
 
 Facts between planes (M4) come from the history, worked out by a small Python job with DuckDB; the live API rereads
