@@ -1,15 +1,4 @@
-import {
-  aircraftType,
-  altitude,
-  arrival,
-  flightName,
-  fromTo,
-  landing,
-  operator,
-  photoCredit,
-  speed,
-  trend,
-} from "@/lib/format";
+import { arrival, flightFacts, flightName, fromTo, landing, operator, photoCredit } from "@/lib/format";
 import type { Status } from "@/lib/useLiveView";
 import type { Plane } from "@/lib/types";
 
@@ -22,8 +11,6 @@ interface Props {
   now: Date | null;
   status: Status;
 }
-
-const trendWord = { climbing: "climbing", descending: "descending", level: "" } as const;
 
 // A fact stays up this long before the next takes its place.
 const factEvery = 20_000;
@@ -63,12 +50,7 @@ export default function Caption({ plane, alsoInView, next, today, facts, now, st
 function InView({ plane }: { plane: Plane }) {
   const photo = plane.info?.photo;
   const route = fromTo(plane);
-  const t = trend(plane);
-  const facts = [
-    aircraftType(plane),
-    altitude(plane) && `${altitude(plane)} ${t ? trendWord[t] : ""}`.trim(),
-    speed(plane),
-  ];
+  const facts = flightFacts(plane);
   return (
     <div className="in-view">
       {photo && (
@@ -81,11 +63,7 @@ function InView({ plane }: { plane: Plane }) {
         {plane.notable && <p className="notable">{plane.notable}</p>}
         <h1 className="flight">{flightName(plane)}</h1>
         <p className="route">{route || operator(plane) || "Route unknown"}</p>
-        <p className="facts">
-          {facts.filter(Boolean).map((f) => (
-            <span key={f}>{f}</span>
-          ))}
-        </p>
+        {facts && <p className="facts">{facts}</p>}
         {landing(plane) && <p className="landing">{landing(plane)}</p>}
       </div>
     </div>
@@ -115,11 +93,7 @@ function Waiting({ next, status }: { next?: Plane; status: Status }) {
       <p className="notable">Coming up</p>
       <h1 className="flight">{flightName(next)}</h1>
       <p className="route">{route ? `${route}, ${arrival(next)}` : arrival(next)}</p>
-      <p className="facts">
-        {[aircraftType(next), altitude(next)].filter(Boolean).map((f) => (
-          <span key={f}>{f}</span>
-        ))}
-      </p>
+      {flightFacts(next) && <p className="facts">{flightFacts(next)}</p>}
     </>
   );
 }

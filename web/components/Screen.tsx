@@ -27,26 +27,28 @@ export default function Screen() {
 
   return (
     <main className={`screen sky-${phase}${status === "live" ? "" : " is-stale"}`}>
-      <Sky view={view} phase={phase} featuredHex={visible[0]?.hex} next={next} />
-      {/* Everything that would otherwise sit still drifts a few pixels now and then, so nothing burns into a TV. */}
-      <div className="overlay" style={{ transform: `translate(${drift.x}px, ${drift.y}px)` }}>
-        <p className="clock">
-          {now && clockFormat.format(now)}
-          {status !== "live" && <span className="clock-status">reconnecting</span>}
-        </p>
-        {view && <Overview view={view} />}
-        <Caption
-          plane={visible[0]}
-          alsoInView={visible.length - 1}
-          next={next}
-          today={view?.today}
-          facts={view?.facts ?? []}
-          now={now}
-          status={status}
-        />
-        <p className="credits">
-          Positions from {sources}; aircraft and routes from adsbdb; photos from planespotters.net.
-        </p>
+      {/* The whole scene, rooftops and words alike, drifts a few pixels now and then, so nothing burns into a TV. */}
+      <div className="scene" style={{ transform: `translate(${drift.x}px, ${drift.y}px)` }}>
+        <Sky view={view} phase={phase} featuredHex={visible[0]?.hex} next={next} />
+        <div className="overlay">
+          <p className="clock">
+            {now && clockFormat.format(now)}
+            {status !== "live" && <span className="clock-status">reconnecting</span>}
+          </p>
+          {view && <Overview view={view} />}
+          <Caption
+            plane={visible[0]}
+            alsoInView={visible.length - 1}
+            next={next}
+            today={view?.today}
+            facts={view?.facts ?? []}
+            now={now}
+            status={status}
+          />
+          <p className="credits">
+            Positions from {sources}; aircraft and routes from adsbdb; photos from planespotters.net.
+          </p>
+        </div>
       </div>
     </main>
   );
@@ -64,7 +66,7 @@ function useNow(interval: number): Date | null {
   return now;
 }
 
-// useDrift moves the overlay to a new spot within a few pixels every few minutes; the CSS eases it there slowly.
+// useDrift moves the scene to a new spot within a few pixels every few minutes; the CSS eases it there slowly.
 function useDrift(): { x: number; y: number } {
   const [drift, setDrift] = useState({ x: 0, y: 0 });
   useEffect(() => {

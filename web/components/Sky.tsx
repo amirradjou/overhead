@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { label } from "@/lib/format";
-import { compassTicks, roofline, rooftops, stars, toScreen, topDeg } from "@/lib/sky";
+import { compassTicks, nearestTurn, roofline, rooftops, stars, toScreen, topDeg } from "@/lib/sky";
 import type { SkyPhase } from "@/lib/sun";
 import type { Plane, View, Window } from "@/lib/types";
 
@@ -27,9 +27,10 @@ export default function Sky({ view, phase, featuredHex, next }: Props) {
   return (
     <div className="sky" aria-hidden="true">
       {dark && (
-        <svg className="stars" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+        // No viewBox: positions in percent, radii in pixels, so a star is round on any screen shape.
+        <svg className="stars">
           {starField.map((s, i) => (
-            <circle key={i} cx={s.x * 1000} cy={s.y * 1000} r={s.r} opacity={s.a} />
+            <circle key={i} cx={`${s.x * 100}%`} cy={`${s.y * 100}%`} r={s.r} opacity={s.a} />
           ))}
         </svg>
       )}
@@ -86,12 +87,14 @@ function useTrails(visible: Plane[], w: Window | undefined) {
 // Craft is one plane in view: its navigation lights after dark, a silhouette by day, pointing the way it moves.
 function Craft({ plane, w, dark, featured }: { plane: Plane; w: Window; dark: boolean; featured: boolean }) {
   const pos = toScreen(w, plane.offset_deg, plane.elevation_deg);
+  const angle = useRef<number | null>(null);
+  angle.current = nearestTurn(angle.current ?? 0, screenAngle(plane, w));
   return (
     <div
       className={`craft${featured ? " is-featured" : ""}`}
       style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
     >
-      <div className="craft-body" style={{ transform: `rotate(${screenAngle(plane, w)}deg)` }}>
+      <div className="craft-body" style={{ transform: `rotate(${angle.current}deg)` }}>
         {dark ? (
           <>
             {/* Seen from below, the left (red) wing of a plane flying right is the one farther away: higher up. */}

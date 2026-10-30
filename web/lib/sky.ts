@@ -16,6 +16,14 @@ export function toScreen(w: Window, offsetDeg: number, elevationDeg: number): { 
   return { x: Math.min(1, Math.max(0, x)), y };
 }
 
+/**
+ * The angle to turn to, as close to prev as it can be: next plus or minus whole turns. A plane flying right to left
+ * points at about ±180°, and a heading that wobbles across that line must turn a few degrees, not spin round.
+ */
+export function nearestTurn(prev: number, next: number): number {
+  return prev + ((((next - prev) % 360) + 540) % 360) - 180;
+}
+
 /** The compass points across the window, with their screen position. */
 export function compassTicks(w: Window): { label: string; x: number }[] {
   const names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -46,20 +54,22 @@ export function seeded(seed: number): () => number {
  * most, never above it, because the roofline is the lowest angle the window sees over them.
  */
 export function rooftops(seed = 7): string {
+  const bleed = 40;
   const rand = seeded(seed);
   const top = roofline * 1000;
   // One closed outline, left to right along the roofs: a chimney is a detour up and down within it, never a new
   // sub-path, or the fill breaks apart.
+  // The outline runs a little past the box on every side, so the drift against burn-in never shows an edge.
   const pts: [number, number][] = [
-    [0, 1000],
-    [0, top + 40],
+    [-bleed, 1000 + bleed],
+    [-bleed, top + 40],
   ];
-  let x = 0;
-  while (x < 1000) {
+  let x = -bleed;
+  while (x < 1000 + bleed) {
     const width = 25 + rand() * 70;
     const drop = rand() < 0.25 ? rand() * 70 : rand() * 18; // most buildings near the line, a few lower ones
     const y = top + drop;
-    const x2 = Math.min(1000, x + width);
+    const x2 = Math.min(1000 + bleed, x + width);
     pts.push([x, y]);
     if (rand() < 0.15) {
       const cx = x + width * (0.2 + rand() * 0.5); // a chimney or a mast
@@ -69,7 +79,7 @@ export function rooftops(seed = 7): string {
     pts.push([x2, y]);
     x = x2;
   }
-  pts.push([1000, 1000]);
+  pts.push([1000 + bleed, 1000 + bleed]);
   return "M" + pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" L") + " Z";
 }
 

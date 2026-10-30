@@ -21,6 +21,27 @@ export function trend(p: Plane): "climbing" | "descending" | "level" | undefined
 
 export const trendArrow = { climbing: "↑", descending: "↓", level: "" } as const;
 
+/**
+ * What the plane is and what it is doing, as one sentence: "Boeing 737 MAX 8, descending through 9,800 ft at
+ * 520 km/h". Written out rather than set as separate pieces, so it reads right even where the pieces' spacing is
+ * lost (old TV browsers ignore flex gaps: "MAX 8" and "9,800 ft" ran together as "89,800 ft").
+ */
+export function flightFacts(p: Plane): string {
+  const type = aircraftType(p);
+  if (p.on_ground) return type ? `${type}, on the ground` : "On the ground";
+  const alt = altitude(p);
+  const kmh = speed(p);
+  const t = trend(p);
+  let doing = "";
+  if (alt && (t === "climbing" || t === "descending")) doing = `${t} through ${alt}${kmh && ` at ${kmh}`}`;
+  else if (alt && t === "level") doing = `level at ${alt}${kmh && `, ${kmh}`}`;
+  else if (alt) doing = `at ${alt}${kmh && `, ${kmh}`}`;
+  else doing = kmh;
+  if (!type) return doing.charAt(0).toUpperCase() + doing.slice(1);
+  if (!doing) return type;
+  return doing.startsWith("at ") ? `${type} ${doing}` : `${type}, ${doing}`;
+}
+
 /** Ground speed in km/h. */
 export function speed(p: Plane): string {
   if (p.speed_kt === undefined || p.on_ground) return "";

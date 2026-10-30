@@ -58,10 +58,11 @@ figure {
 }
 .sky-day {
   /* Muted: a TV left on all day should not be a light box. */
-  background: linear-gradient(to bottom, #3f6a92 0%, #7a9fbc 45%, #afc5d2 var(--roofline));
+  background: linear-gradient(to bottom, #2c5274 0%, #557c9b 45%, #7f9cb1 var(--roofline));
   --roof: #18222d;
 }
 
+.scene,
 .sky,
 .overlay {
   position: absolute;
@@ -78,6 +79,9 @@ figure {
 }
 .stars circle {
   fill: #fff;
+}
+.roofs {
+  overflow: visible; /* the outline bleeds past the edges, for the drift */
 }
 .roofs path {
   fill: var(--roof);
@@ -182,11 +186,11 @@ figure {
 }
 
 /* Where the next plane comes into view. */
+/* No flex gap anywhere: Chromium before 84 (TV browsers) ignores it. Margins space things instead. */
 .cue {
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
   transform: translate(-50%, -50%);
   font-size: 0.58rem;
   color: var(--amber);
@@ -203,6 +207,7 @@ figure {
   transform: translate(-100%, -50%);
 }
 .cue-mark {
+  margin-right: 0.4rem;
   width: 0.55rem;
   height: 0.55rem;
   border-top: 0.12rem solid var(--amber);
@@ -213,6 +218,7 @@ figure {
   transform: rotate(45deg);
 }
 .cue-right .cue-mark {
+  margin: 0 0 0 0.4rem;
   transform: rotate(-135deg);
 }
 .cue-rooftops .cue-mark {
@@ -247,10 +253,12 @@ figure {
   color: var(--text-faint);
 }
 
-/* The overlay drifts a few pixels every few minutes, slowly enough not to be seen moving. */
+/* The scene drifts a few pixels every few minutes, slowly enough not to be seen moving. */
+.scene {
+  transition: transform 40s ease-in-out;
+}
 .overlay {
   pointer-events: none;
-  transition: transform 40s ease-in-out;
 }
 .sky-night .overlay {
   opacity: 0.82; /* dimmer after dark */
@@ -325,16 +333,16 @@ figure {
 .in-view {
   display: flex;
   align-items: flex-end;
-  gap: 1rem;
 }
 .photo {
   flex: none;
   position: relative;
+  margin-right: 1rem;
 }
 .photo img {
   display: block;
+  width: 7.8rem; /* 3:2, set as two lengths: aspect-ratio needs Chromium 88 */
   height: 5.2rem;
-  aspect-ratio: 3 / 2;
   object-fit: cover;
   border-radius: 0.15rem;
   opacity: 0.9;
@@ -365,9 +373,6 @@ figure {
   color: var(--text);
 }
 .facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 1.1rem;
   margin-top: 0.3rem;
   font-size: 0.7rem;
   color: var(--text-soft);

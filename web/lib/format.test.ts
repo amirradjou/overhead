@@ -4,6 +4,7 @@ import {
   altitude,
   arrival,
   direction,
+  flightFacts,
   flightName,
   fromTo,
   label,
@@ -52,6 +53,26 @@ const porter = plane({
 });
 
 describe("format", () => {
+  it("says what the plane is doing in one sentence", () => {
+    const max = {
+      type_code: "B38M",
+      info: { hex: "c0ffee", type_name: "737 MAX 8", manufacturer: "Boeing" },
+    };
+    expect(flightFacts(plane({ ...max, alt_ft: 9800, vert_rate_fpm: -1200, speed_kt: 280 }))).toBe(
+      "Boeing 737 MAX 8, descending through 9,800 ft at 520 km/h",
+    );
+    expect(flightFacts(plane({ ...max, alt_ft: 36000, vert_rate_fpm: 0, speed_kt: 460 }))).toBe(
+      "Boeing 737 MAX 8, level at 36,000 ft, 850 km/h",
+    );
+    expect(flightFacts(plane({ ...max, alt_ft: 4100 }))).toBe("Boeing 737 MAX 8 at 4,100 ft");
+    expect(flightFacts(plane({ alt_ft: 4100, vert_rate_fpm: 1800, speed_kt: 220 }))).toBe(
+      "Climbing through 4,100 ft at 405 km/h",
+    );
+    expect(flightFacts(plane({ ...max, on_ground: true }))).toBe("Boeing 737 MAX 8, on the ground");
+    expect(flightFacts(plane({ speed_kt: 220 }))).toBe("405 km/h");
+    expect(flightFacts(plane())).toBe("");
+  });
+
   it("writes altitude, trend and speed for a living room", () => {
     const p = plane({ alt_ft: 9712, vert_rate_fpm: -1408, speed_kt: 327.4 });
     expect(altitude(p)).toBe("9,700 ft");

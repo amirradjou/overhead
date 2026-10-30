@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compassTicks, roofline, rooftops, seeded, stars, toScreen, topDeg } from "./sky";
+import { compassTicks, nearestTurn, roofline, rooftops, seeded, stars, toScreen, topDeg } from "./sky";
 import { skyPhase, sunElevation } from "./sun";
 import type { Window } from "./types";
 
@@ -25,6 +25,14 @@ describe("the window on screen", () => {
     expect(round).toHaveLength(8);
     expect(round.find((t) => t.label === "N")?.x).toBe(0.5);
     expect(round.find((t) => t.label === "S")?.x).toBe(1);
+  });
+
+  it("turns a plane the short way round", () => {
+    expect(nearestTurn(179, -179)).toBe(181);
+    expect(nearestTurn(-170, 170)).toBe(-190);
+    expect(nearestTurn(725, 10)).toBe(730);
+    expect(nearestTurn(0, 90)).toBe(90);
+    expect(nearestTurn(0, -90)).toBe(-90);
   });
 
   it("draws the same rooftops and stars every time, never above the roofline", () => {
