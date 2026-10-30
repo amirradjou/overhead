@@ -1,6 +1,6 @@
 // The airport the screen follows (overhead live -airport): which planes a focused screen shows, and the words for a
 // flight landing at it or taking off from it, seen from a window that may look down on it.
-import { place } from "./format";
+import { altFt, place } from "./format";
 import { duration } from "./progress";
 import type { FollowedAirport, Plane, View, Window } from "./types";
 
@@ -99,8 +99,9 @@ export function airportStatus(p: Plane, ap?: FollowedAirport): string {
  */
 export function heightFromWindow(p: Plane, w: Window): string {
   if (p.on_ground) return "on the ground";
-  if (p.alt_ft === undefined) return "";
-  const diff = p.alt_ft * 0.3048 - w.home_elevation_m;
+  const ft = altFt(p);
+  if (ft === undefined) return "";
+  const diff = ft * 0.3048 - w.home_elevation_m;
   if (Math.abs(diff) < 15) return "level with your window";
   const size = Math.abs(diff);
   const amount = size < 1000 ? `${Math.round(size / 5) * 5} m` : `${(size / 1000).toFixed(1)} km`;
@@ -110,7 +111,8 @@ export function heightFromWindow(p: Plane, w: Window): string {
 /** "1,150 ft", "On the ground". */
 export function feet(p: Plane): string {
   if (p.on_ground) return "On the ground";
-  return p.alt_ft === undefined ? "" : `${thousands.format(Math.round(p.alt_ft / 25) * 25)} ft`;
+  const ft = altFt(p);
+  return ft === undefined ? "" : `${thousands.format(Math.round(ft / 25) * 25)} ft`;
 }
 
 /** "descending 700 ft/min", "climbing 1,800 ft/min", "level", or "" on the ground or when unknown. */
@@ -172,7 +174,8 @@ const boardStatus: Record<string, (p: Plane) => string> = {
 
 /** The flight as the board lists it: "PD 2943", an airline callsign, else the registration ("C-GRYY"). */
 function boardFlight(p: Plane): string {
-  const iata = p.info?.route?.flight_iata?.match(/^([A-Z0-9]{2})(\d+[A-Z]?)$/);
+  // An airline code has a letter in it: "1813" (as adsbdb gives some flights) is not "18 13".
+  const iata = p.info?.route?.flight_iata?.match(/^([A-Z][A-Z0-9]|[0-9][A-Z])(\d+[A-Z]?)$/);
   if (iata) return `${iata[1]} ${iata[2]}`;
   if (p.callsign && /^[A-Z]{3}\d/.test(p.callsign)) return p.callsign;
   return p.info?.registration || p.registration || p.callsign || p.hex.toUpperCase();

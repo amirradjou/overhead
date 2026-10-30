@@ -38,6 +38,15 @@ const points = [
   "north-north-west",
 ];
 
+/** The cloud cover in words, finer than the WMO code's four steps: a broken deck is "mostly cloudy". */
+export function cover(pct: number): string {
+  if (pct < 10) return "clear";
+  if (pct < 30) return "mostly clear";
+  if (pct < 60) return "partly cloudy";
+  if (pct < 90) return "mostly cloudy";
+  return "overcast";
+}
+
 /** "the west-north-west": a bearing as one of 16 compass points. */
 export function compass16(deg: number): string {
   return points[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16] ?? "north";
@@ -55,7 +64,7 @@ function runwayHeading(name: string, declinationDeg = -10): number {
  */
 export function weatherLine(w: Weather, ap?: FollowedAirport): string {
   const parts: string[] = [];
-  const s = sky(w.code);
+  const s = w.code >= 1 && w.code <= 3 ? cover(w.cloud_cover) : sky(w.code);
   parts.push(`${Math.round(w.temp_c)}°C${s ? ` and ${s}` : ""}.`);
   if (w.wind_kmh < 5) {
     parts.push("Almost no wind.");

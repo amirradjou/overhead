@@ -91,6 +91,9 @@ export interface Weather {
   /** Where the wind blows from, degrees clockwise from north. */
   wind_from_deg: number;
   gust_kmh: number;
+  pressure_hpa?: number;
+  /** The airport whose weather report gave the sky and the wind, when one did. */
+  station?: string;
 }
 
 /** When and where a plane comes into view. */
@@ -137,6 +140,8 @@ export interface Plane {
   near?: boolean;
   /** One of the planes a focused screen shows. */
   focus?: boolean;
+  /** The true altitude: alt_ft corrected for today's pressure, below 18,000 ft, when the pressure is known. */
+  alt_msl_ft?: number;
 }
 
 export interface View {
