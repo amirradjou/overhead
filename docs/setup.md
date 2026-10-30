@@ -30,7 +30,7 @@ Everything in `.env`:
 | `OVERHEAD_LAT`, `OVERHEAD_LON` | home | right-click your building on a map and copy the coordinates; three decimals (about 100 m) is plenty, since 100 m moves a plane 10 km away by under 1° |
 | `OVERHEAD_HOME_ELEV` | the window's height above sea level, in metres | the ground's height from a map that shows elevation (Google Earth shows it under the pointer), plus about 3 m a floor |
 | `OVERHEAD_WINDOW_AZ`, `OVERHEAD_WINDOW_FOV` | the direction the window faces and how wide a slice of sky it shows, in degrees | from where you sit, below |
-| `OVERHEAD_WINDOW_MIN_EL` | the lowest angle you can see, over the roofs opposite | from where you sit, below |
+| `OVERHEAD_WINDOW_MIN_EL` | the lowest angle you can see, over the roofs opposite; negative from high up, where you look down past the horizon | from where you sit, below |
 | `OVERHEAD_WINDOW_MAX_EL` | the window's top edge, as an angle above the horizon | from where you sit, below |
 | `OVERHEAD_TZ` | the time zone of "today" | `America/Toronto` |
 
@@ -46,7 +46,11 @@ Measure from where you usually sit, since the window shows a different slice of 
    you can lay its edge along your line of sight). Aim at the top of the roofs opposite for `OVERHEAD_WINDOW_MIN_EL`
    and at the window's top edge for `OVERHEAD_WINDOW_MAX_EL`. Without an app, the angle of the top edge is
    atan(how far it is above your eyes ÷ how far it is from your eyes): 1 m above and 1.7 m away is 30°.
-3. Apply it: `docker compose up -d` recreates the services whose settings changed.
+   From high up with nothing opposite, the lowest angle is below the horizon: the bottom of the glass, or the
+   balcony's edge, as seen from your seat (down to -45).
+3. To follow an airport you can see, add `OVERHEAD_AIRPORT=CYTZ` (Billy Bishop) and `OVERHEAD_NEAR_KM=3`: the screen
+   then shows only that airport's landings and take-offs and planes within 3 km of the window, each in full.
+4. Apply it: `docker compose up -d` recreates the services whose settings changed.
 
 **Check:** the next time a plane crosses the window, it should be on the screen at the same place. If planes are
 always a little to one side, move `OVERHEAD_WINDOW_AZ` by that many degrees; if they appear on the screen while
