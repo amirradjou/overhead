@@ -1,0 +1,18 @@
+{
+  "ac": [
+    {"hex": "c08861", "type": "adsb_icao", "flight": "POE672  ", "r": "C-GZQU", "t": "E295", "alt_baro": 9700, "alt_geom": 9800, "gs": 327.4, "track": 70.18, "baro_rate": -1408, "geom_rate": -1376, "squawk": "5561", "emergency": "none", "category": "A3", "lat": 43.595398, "lon": -79.865879, "seen_pos": 0.5, "seen": 0.0},
+    {"hex": "C0174F", "type": "adsb_icao", "flight": "ACA101  ", "r": "C-FGKN", "t": "B38M", "alt_baro": "ground", "gs": 12.1, "track": 240.0, "squawk": "1234", "category": "A3", "lat": 43.6801, "lon": -79.6122, "seen_pos": 2.0, "seen": 1.0},
+    {"hex": "c0ffee", "type": "adsb_icao", "flight": "JZA555  ", "r": "C-GKEJ", "t": "DH8D", "alt_baro": 4000, "seen": 3.1},
+    {"hex": "~2a1b3c", "type": "tisb_other", "alt_baro": 2500, "lat": 43.70, "lon": -79.55, "seen_pos": 4.0},
+    {"hex": "a0b1c2", "type": "adsb_icao", "flight": "DAL1234 ", "t": "A321", "alt_baro": 35000, "lat": 44.2, "lon": -79.6, "seen_pos": 0.1},
+    {"hex": "ae1234", "type": "mlat", "flight": "RCH401  ", "t": "C17", "alt_geom": 3000, "geom_rate": 640, "squawk": "7700", "emergency": "general", "dbFlags": 1, "lat": 43.75, "lon": -79.70, "seen_pos": 1.0},
+    {"hex": "a12345", "type": "adsb_icao", "flight": "N123AB  ", "r": "N123AB", "t": "C56X", "alt_baro": 12000, "dbFlags": 8, "lat": 43.60, "lon": -79.50},
+    {"hex": "c0aaaa", "type": "adsb_icao", "flight": "WJA123  ", "t": "B38M", "alt_baro": null, "alt_geom": 5025, "category": "A3", "lat": 43.65, "lon": -79.60, "seen_pos": 1.0},
+    {"hex": "c1e9ce", "type": "adsb_icao_nt", "flight": "TR541   ", "t": "SERV", "alt_baro": "ground", "gs": 16, "category": "C2", "lat": 43.6785, "lon": -79.6212, "seen_pos": 2.0}
+  ],
+  "msg": "No error",
+  "now": 1793324881501,
+  "total": 7,
+  "ctime": 1793324881501,
+  "ptime": 0
+}
