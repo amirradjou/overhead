@@ -26,8 +26,8 @@ naming the project, backs off after errors and honours Retry-After.
 | adsb.fi | live positions in a radius | free for personal, non-commercial use; one request a second; credit with a link |
 | airplanes.live | live positions in a radius | free for non-commercial use, about one request a second; now answers 403 until the project is approved by email, so it is off by default |
 | OpenSky Network | live positions (fallback) and an aircraft database | free account, daily request credits |
-| adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free |
-| planespotters.net | a photo of that exact airframe | photographer credit required |
+| adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data may not be copied into other databases, so routes stay in the day-long cache and never reach the history |
+| planespotters.net | a photo of that exact airframe | photographer credit and a link to the photo page on every photo |
 
 Coverage is what the volunteer receivers see — excellent around Toronto Pearson, thinner for very low flights.
 
@@ -81,6 +81,22 @@ make build
 OVERHEAD_LAT=43.65 OVERHEAD_LON=-79.38 ./bin/overhead watch -radius 20
 ./bin/overhead watch -for 1h > run.log   # M0's check: one line per poll, then pass/fail on gaps and duplicates
 ```
+
+The event pipeline (M1), each command in its own terminal or under a process manager:
+
+```sh
+docker compose up -d                 # RabbitMQ; management UI on http://localhost:15673 (overhead / overhead)
+./bin/overhead enrich                # enrichment worker; cache in data/enrich.db
+./bin/overhead history               # one-minute batches in data/history/positions/dt=.../hour=.../
+./bin/overhead live                  # http://localhost:8090/api/now, /api/events (SSE), /api/coverage
+./bin/overhead poll                  # polls the feeds, publishes positions and enrichment jobs
+./bin/overhead verify                # checks data/history: every published position stored exactly once
+```
+
+Every position event carries the poller's run id and a sequence number, so `verify` can prove nothing was lost or
+stored twice. The history writer acknowledges a batch only after writing it, and a batch's file name comes from its
+first sequence number, so a redelivered batch overwrites its own file. Changing a queue's arguments in
+`internal/bus` needs that queue deleted first (RabbitMQ refuses a redeclaration that differs).
 
 `-feeds adsb.lol,adsb.fi` is the default; `airplanes.live` can be added once it grants access. Airport ground
 vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
