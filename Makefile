@@ -21,7 +21,8 @@ up:
 	$(TF) init -input=false
 	$(TF) apply -input=false -auto-approve
 	$(MAKE) image
-	aws ecs update-service --cluster overhead --service overhead --force-new-deployment > /dev/null
+	aws ecs update-service --cluster $$($(TF) output -raw cluster) --service $$($(TF) output -raw service) \
+		--force-new-deployment > /dev/null
 
 down:
 	$(TF) destroy -input=false -auto-approve

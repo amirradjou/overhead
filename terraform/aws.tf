@@ -95,6 +95,7 @@ locals {
     { name = "OVERHEAD_LAT", value = tostring(var.center.lat) },
     { name = "OVERHEAD_LON", value = tostring(var.center.lon) },
     { name = "AWS_REGION", value = var.region },
+    { name = "OVERHEAD_TZ", value = var.timezone },
   ]
   logs = {
     logDriver = "awslogs"
@@ -120,8 +121,9 @@ resource "aws_ecs_task_definition" "overhead" {
   }
   container_definitions = jsonencode([
     {
-      name             = "rabbitmq"
-      image            = "rabbitmq:4.1-alpine"
+      name = "rabbitmq"
+      # The Docker library image through ECR Public: Docker Hub limits anonymous pulls from shared AWS addresses.
+      image            = "public.ecr.aws/docker/library/rabbitmq:4.1-alpine"
       essential        = true
       environment      = [{ name = "RABBITMQ_DEFAULT_USER", value = "overhead" }, { name = "RABBITMQ_DEFAULT_PASS", value = "overhead" }]
       logConfiguration = local.logs

@@ -7,6 +7,14 @@ output "history_url" {
   value       = "s3://${aws_s3_bucket.history.bucket}/${var.history_prefix}"
 }
 
+output "cluster" {
+  value = aws_ecs_cluster.overhead.name
+}
+
+output "service" {
+  value = aws_ecs_service.overhead.name
+}
+
 output "image_repository" {
   description = "Push the image here (make image)."
   value       = aws_ecr_repository.overhead.repository_url

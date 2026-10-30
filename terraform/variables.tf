@@ -28,6 +28,12 @@ variable "center" {
   default     = { lat = 43.6777, lon = -79.6248 }
 }
 
+variable "timezone" {
+  description = "The time zone of \"today\" for the services (they run in UTC otherwise)."
+  type        = string
+  default     = "America/Toronto"
+}
+
 variable "snowflake" {
   description = "Create the Snowflake side (needs SNOWFLAKE_* credentials); false keeps everything in AWS."
   type        = bool
