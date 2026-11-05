@@ -60,8 +60,43 @@ services:
     <<: *overhead
     command: ["live", "-web", "/web"]
     ports:
-      # The TV reads it over the home network. It serves home's coordinates: keep it off the internet.
+      # The TV reads it over the home network. It shows every plane, private ones too: keep it off the internet.
       - "8090:8090"
+
+  # The instance anyone may see, only with `--profile public` (docs/setup.md, section 6). It faces the internet, so it
+  # gets what it needs and no more: its settings named one by one (no .env, so no Telegram token), no data volume, a
+  # read-only filesystem and no capabilities. Reach it through a tunnel to 127.0.0.1:8091.
+  live-public:
+    profiles: ["public"]
+    image: overhead:local
+    pull_policy: never
+    command: ["live", "-web", "/web", "-public"]
+    environment:
+      OVERHEAD_AMQP: amqp://overhead:overhead@rabbitmq:5672/
+      OVERHEAD_TZ: ${OVERHEAD_TZ:-}
+      OVERHEAD_LAT: ${OVERHEAD_LAT:-}
+      OVERHEAD_LON: ${OVERHEAD_LON:-}
+      OVERHEAD_HOME_ELEV: ${OVERHEAD_HOME_ELEV:-}
+      OVERHEAD_WINDOW_AZ: ${OVERHEAD_WINDOW_AZ:-}
+      OVERHEAD_WINDOW_FOV: ${OVERHEAD_WINDOW_FOV:-}
+      OVERHEAD_WINDOW_MIN_EL: ${OVERHEAD_WINDOW_MIN_EL:-}
+      OVERHEAD_WINDOW_MAX_EL: ${OVERHEAD_WINDOW_MAX_EL:-}
+      OVERHEAD_AIRPORT: ${OVERHEAD_AIRPORT:-}
+      OVERHEAD_NEAR_KM: ${OVERHEAD_NEAR_KM:-}
+      OVERHEAD_WEATHER: ${OVERHEAD_WEATHER:-}
+      OVERHEAD_METAR: ${OVERHEAD_METAR:-}
+      OVERHEAD_PUBLIC_ROUTES: ${OVERHEAD_PUBLIC_ROUTES:-}
+      OVERHEAD_PUBLIC_PHOTOS: ${OVERHEAD_PUBLIC_PHOTOS:-}
+    ports:
+      - "127.0.0.1:8091:8090"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    mem_limit: 128m
 
   headsup:
     <<: *overhead

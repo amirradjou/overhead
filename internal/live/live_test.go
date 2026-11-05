@@ -2,10 +2,14 @@ package live
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -286,5 +290,257 @@ func TestCommercial(t *testing.T) {
 		if got := Commercial(feeds.Position{Callsign: cs}); got != want {
 			t.Errorf("Commercial(%q) = %v, want %v", cs, got, want)
 		}
+	}
+}
+
+// A public stream decodes as gzip from any point, one standalone block per snapshot, and the first snapshot arrives
+// before the stream is ever finished: a browser reads it as it comes.
+func TestPublicStreamIsGzipFromTheFirstSnapshot(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 30, Public: true}
+	s.Update(pos("aaaaaa", "ACA1", 43.70, t0))
+	s.Update(pos("bbbbbb", "N123AB", 43.70, t0))
+	srv := &Server{State: s, Public: true, Every: 20 * time.Millisecond, Now: func() time.Time { return t0 }}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go srv.Run(ctx)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/events", nil)
+	req.Header.Set("Accept-Encoding", "gzip") // set by hand, so the transport leaves the body compressed
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if got := resp.Header.Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q", got)
+	}
+	gz, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := bufio.NewScanner(gz)
+	sc.Buffer(nil, 1<<20)
+	snapshots := 0
+	for snapshots < 3 && sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var v View
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &v); err != nil {
+			t.Fatalf("snapshot %d: %v", snapshots, err)
+		}
+		if !v.Public || len(v.Planes) != 1 || v.Planes[0].Hex != "aaaaaa" {
+			t.Fatalf("snapshot %d: public %v, planes %+v", snapshots, v.Public, v.Planes)
+		}
+		snapshots++
+	}
+	if snapshots < 3 {
+		t.Fatalf("got %d snapshots, err %v", snapshots, sc.Err())
+	}
+}
+
+func TestPublicStreamWithoutGzipIsPlain(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 30, Public: true}
+	srv := &Server{State: s, Public: true}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/events", nil)
+	req.Header.Set("Accept-Encoding", "identity")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	sc := bufio.NewScanner(resp.Body)
+	if !sc.Scan() || sc.Text() != "retry: 3000" || resp.Header.Get("Content-Encoding") != "" {
+		t.Fatalf("first line %q, encoding %q", sc.Text(), resp.Header.Get("Content-Encoding"))
+	}
+}
+
+// The home instance streams as it always has, whatever the browser accepts: TV browsers are old.
+func TestHomeStreamIsNeverCompressed(t *testing.T) {
+	srv := &Server{State: &State{Center: pearson, RadiusKm: 30}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/events", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if got := resp.Header.Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q", got)
+	}
+	if got := resp.Header.Get("Content-Security-Policy"); got != "" {
+		t.Fatalf("the home instance got the public headers: %q", got)
+	}
+}
+
+func TestPublicStreamsAreCapped(t *testing.T) {
+	srv := &Server{State: &State{Center: pearson, RadiusKm: 30}, Public: true, MaxStreams: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	open := func() *http.Response {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/events", nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+	first := open()
+	defer first.Body.Close()
+	if first.StatusCode != http.StatusOK {
+		t.Fatalf("first stream: %s", first.Status)
+	}
+	second := open()
+	defer second.Body.Close()
+	if second.StatusCode != http.StatusServiceUnavailable || second.Header.Get("Retry-After") == "" {
+		t.Fatalf("second stream: %s, Retry-After %q", second.Status, second.Header.Get("Retry-After"))
+	}
+	if got := second.Header.Get("Content-Security-Policy"); got == "" {
+		t.Fatal("no Content-Security-Policy on the public instance")
+	}
+}
+
+// /api/now on the public instance answers from the shared snapshot: asking does no work, however often it is asked.
+func TestPublicNowAnswersFromTheSnapshot(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 30, Public: true}
+	s.Update(pos("aaaaaa", "ACA1", 43.70, t0))
+	srv := &Server{State: s, Public: true, Every: time.Hour, Now: func() time.Time { return t0 }}
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	get := func() View {
+		resp, err := http.Get(ts.URL + "/api/now")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var v View
+		if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if v := get(); len(v.Planes) != 1 {
+		t.Fatalf("planes = %d", len(v.Planes))
+	}
+	s.Update(pos("cccccc", "ACA2", 43.70, t0))
+	if v := get(); len(v.Planes) != 1 {
+		t.Fatalf("planes = %d: the answer was worked out again within the tick", len(v.Planes))
+	}
+}
+
+func TestSourcesCreditEveryFeedThatReported(t *testing.T) {
+	s := &State{Center: pearson, RadiusKm: 30, Public: true}
+	a, b := pos("aaaaaa", "ACA1", 43.70, t0), pos("bbbbbb", "N123AB", 43.70, t0)
+	b.Source = "adsb.lol" // the only report from this feed, of a plane the public view leaves out
+	s.Update(a)
+	s.Update(b)
+	v := s.View(t0)
+	if len(v.Planes) != 1 || !slices.Equal(v.Sources, []string{"adsb.fi", "adsb.lol"}) {
+		t.Fatalf("planes %d, sources %v", len(v.Planes), v.Sources)
+	}
+}
+
+func TestStaticNeverListsADirectory(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{"index.html": "home", "_next/static/app.js": "js", "empty/.keep": ""} {
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ts := httptest.NewServer(Static(dir))
+	defer ts.Close()
+	for path, want := range map[string]int{
+		"/": http.StatusOK, "/_next/static/app.js": http.StatusOK,
+		"/_next/static/": http.StatusNotFound, "/empty/": http.StatusNotFound, "/nothing": http.StatusNotFound,
+	} {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("%s: %s, want %d", path, resp.Status, want)
+		}
+	}
+	resp, err := http.Get(ts.URL + "/_next/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if !strings.Contains(resp.Header.Get("Cache-Control"), "immutable") {
+		t.Errorf("Cache-Control = %q", resp.Header.Get("Cache-Control"))
+	}
+}
+
+// Routes and photos stay off a public page until their sources allow them; a route still places the plane.
+func TestPublicViewHoldsBackRoutesAndPhotos(t *testing.T) {
+	route := &events.Route{Callsign: "ACA1", Airline: "Air Canada",
+		Origin:      events.Airport{ICAO: "CYUL", Lat: 45.47, Lon: -73.74},
+		Destination: events.Airport{ICAO: "CYYZ", Lat: 43.6777, Lon: -79.6248}}
+	photo := &events.Photo{Thumbnail: "https://t.plnspttrs.net/x.jpg", Link: "https://www.planespotters.net/photo/1", Photographer: "A"}
+	air := events.Aircraft{Hex: "aaaaaa", TypeName: "A320", Owner: "Air Canada", Route: route, Photo: photo, Looked: t0}
+	view := func(s *State) Plane {
+		t.Helper()
+		s.Update(pos("aaaaaa", "ACA1", 43.70, t0))
+		s.SetAircraft(air)
+		v := s.View(t0)
+		if len(v.Planes) != 1 || v.Planes[0].Info == nil {
+			t.Fatalf("planes = %+v", v.Planes)
+		}
+		return v.Planes[0]
+	}
+
+	p := view(&State{Center: pearson, RadiusKm: 30, Public: true})
+	if p.Info.Route != nil || p.Info.Photo != nil || p.ToDestinationKm != nil || p.ETAMin != nil {
+		t.Fatalf("public plane = %+v, info %+v", p, p.Info)
+	}
+	if p.Info.Owner != "Air Canada" || p.Info.TypeName != "A320" {
+		t.Fatalf("the aircraft's own details went too: %+v", p.Info)
+	}
+	raw, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, leak := range []string{"CYUL", "CYYZ", "plnspttrs", "planespotters"} {
+		if strings.Contains(string(raw), leak) {
+			t.Errorf("%s in the public JSON: %s", leak, raw)
+		}
+	}
+
+	if p := view(&State{Center: pearson, RadiusKm: 30, Public: true, PublicRoutes: true, PublicPhotos: true}); p.Info.Route == nil || p.Info.Photo == nil {
+		t.Fatalf("with permission: %+v", p.Info)
+	}
+	if p := view(&State{Center: pearson, RadiusKm: 30}); p.Info.Route == nil || p.Info.Photo == nil {
+		t.Fatalf("at home: %+v", p.Info)
+	}
+}
+
+// A focused public view sends only what the screen draws: the planes in focus and those on the airport's board.
+func TestPublicFocusedViewDropsPlanesNeverDrawn(t *testing.T) {
+	ap := Airports["CYTZ"]
+	s := &State{Center: geo.Point{Lat: 43.6426, Lon: -79.3871}, RadiusKm: 60, Public: true, Airport: &ap, NearKm: 3}
+	alt, gs, far := 3000, 180.0, 36000
+	s.Update(events.Position{Position: feeds.Position{Hex: "aaaaaa", Callsign: "ACA1", Lat: 43.65, Lon: -79.39, AltFt: &alt, SpeedKt: &gs, Source: "adsb.lol", At: t0}})
+	s.Update(events.Position{Position: feeds.Position{Hex: "bbbbbb", Callsign: "ACA2", Lat: 44.0, Lon: -79.8, AltFt: &far, SpeedKt: &gs, Source: "adsb.lol", At: t0}})
+	v := s.View(t0)
+	if len(v.Planes) != 1 || v.Planes[0].Hex != "aaaaaa" {
+		t.Fatalf("planes = %+v", v.Planes)
 	}
 }

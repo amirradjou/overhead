@@ -146,3 +146,73 @@ func TestNewRun(t *testing.T) {
 		t.Fatal("ValidRun must accept NewRun's ids and nothing path-like")
 	}
 }
+
+func publicEvents(t *testing.T, sent []bus.Message) []events.Position {
+	t.Helper()
+	var out []events.Position
+	for _, m := range sent {
+		if m.Exchange != bus.ExchangePositionsPublic {
+			continue
+		}
+		var p events.Position
+		if err := json.Unmarshal(m.Body, &p); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// The public exchange gets the named feed's own reports, once each, whatever the merged picture says, and nothing at
+// all from the other feed. The merged picture's flags are the exception: they only ever hide an aircraft.
+func TestPublicFeedPublishesOnlyThatFeedsOwnReports(t *testing.T) {
+	pub := &fakePub{}
+	r := &Relay{Run: "run", Pub: pub, PublicFeed: "adsb.lol"}
+
+	own := feeds.Position{Hex: "aaaaaa", Callsign: "ACA1", Source: "adsb.lol", At: t0}
+	freshest := feeds.Position{Hex: "aaaaaa", Callsign: "ACA1", Registration: "C-FILL", Source: "adsb.fi", At: t0.Add(time.Second)}
+	otherOnly := feeds.Position{Hex: "bbbbbb", Callsign: "ACA2", Source: "adsb.fi", At: t0}
+	hidden := feeds.Position{Hex: "cccccc", Callsign: "ACA3", Source: "adsb.lol", At: t0}
+	hiddenMerged := feeds.Position{Hex: "cccccc", Callsign: "ACA3", Source: "adsb.fi", Private: true, At: t0}
+
+	s := snap(t0, freshest, otherOnly, hiddenMerged)
+	s.Answers = map[string][]feeds.Position{
+		"adsb.lol": {own, hidden},
+		"adsb.fi":  {freshest, otherOnly, hiddenMerged},
+	}
+	if err := r.Handle(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	got := publicEvents(t, pub.sent)
+	if len(got) != 2 {
+		t.Fatalf("public events = %+v", got)
+	}
+	if got[0].Hex != "aaaaaa" || got[0].Source != "adsb.lol" || got[0].Registration != "" || !got[0].At.Equal(t0) {
+		t.Errorf("the other feed's report reached the public exchange: %+v", got[0])
+	}
+	if got[1].Hex != "cccccc" || !got[1].Private {
+		t.Errorf("a private flag from the other feed was lost: %+v", got[1])
+	}
+
+	// The feed sits out the next poll, so its answer comes round again: nothing new to publish.
+	pub.sent = nil
+	if err := r.Handle(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	if got := publicEvents(t, pub.sent); len(got) != 0 {
+		t.Fatalf("published again: %+v", got)
+	}
+}
+
+func TestNoPublicFeedPublishesNothingPublic(t *testing.T) {
+	pub := &fakePub{}
+	r := &Relay{Run: "run", Pub: pub}
+	s := snap(t0, plane("aaaaaa", "ACA1", t0))
+	s.Answers = map[string][]feeds.Position{"adsb.lol": {plane("aaaaaa", "ACA1", t0)}}
+	if err := r.Handle(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	if got := publicEvents(t, pub.sent); len(got) != 0 {
+		t.Fatalf("public events = %+v", got)
+	}
+}

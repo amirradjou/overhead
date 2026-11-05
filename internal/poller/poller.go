@@ -79,8 +79,10 @@ type FeedResult struct {
 type Snapshot struct {
 	At       time.Time
 	Aircraft []Aircraft // nearest first
-	Feeds    []FeedResult
-	Stats    Stats
+	// Answers is each feed's own latest answer, unmerged, by feed name, while it is younger than MaxAge.
+	Answers map[string][]feeds.Position
+	Feeds   []FeedResult
+	Stats   Stats
 }
 
 // Stats summarises a run so far.
@@ -159,14 +161,16 @@ func (p *Poller) Poll(ctx context.Context, now time.Time) (Snapshot, bool) {
 
 	cutoff := now.Add(-p.maxAge())
 	var lists [][]feeds.Position
-	for _, st := range p.state {
+	answers := make(map[string][]feeds.Position)
+	for i, st := range p.state {
 		if !st.lastAt.IsZero() && !st.lastAt.Before(cutoff) {
 			lists = append(lists, st.last)
+			answers[p.Feeds[i].Name()] = st.last
 		}
 	}
 	p.picture = slices.DeleteFunc(feeds.Merge(lists...), func(pos feeds.Position) bool { return pos.At.Before(cutoff) })
 
-	snap := Snapshot{At: now, Feeds: results, Aircraft: p.place()}
+	snap := Snapshot{At: now, Feeds: results, Aircraft: p.place(), Answers: answers}
 	p.record(now, answered, results, snap.Aircraft)
 	snap.Stats = p.Stats()
 	return snap, true

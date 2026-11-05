@@ -18,7 +18,7 @@ import (
 )
 
 // These tests need a RabbitMQ to themselves: OVERHEAD_TEST_AMQP names a vhost they may purge, e.g.
-// amqp://overhead:overhead@localhost:5673/overhead-test (see CLAUDE.md for creating it). CI starts one.
+// amqp://overhead:overhead@localhost:5673/overhead-test (docs/setup.md, "Development", for creating it). CI starts one.
 func brokerURL(t *testing.T) string {
 	t.Helper()
 	url := os.Getenv("OVERHEAD_TEST_AMQP")
@@ -41,7 +41,7 @@ func brokerURL(t *testing.T) string {
 	if err := bus.Declare(ch); err != nil {
 		t.Fatalf("second Declare: %v", err)
 	}
-	for _, q := range []string{bus.QueueLive, bus.QueueHistory, bus.QueueAlerts, bus.QueueLiveAircraft, bus.QueueEnrich, bus.QueueEnrichRetry, bus.QueueEnrichDead} {
+	for _, q := range []string{bus.QueueLive, bus.QueueLivePublic, bus.QueueHistory, bus.QueueAlerts, bus.QueueLiveAircraft, bus.QueueLivePublicAircraft, bus.QueueEnrich, bus.QueueEnrichRetry, bus.QueueEnrichDead} {
 		if _, err := ch.QueuePurge(q, false); err != nil {
 			t.Fatal(err)
 		}

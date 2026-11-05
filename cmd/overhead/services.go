@@ -44,8 +44,10 @@ func runPoll(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	publicFeed := fs.String("public-feed", env("OVERHEAD_PUBLIC_FEED", ""),
+		"also publish this feed's own reports for the public instance (OVERHEAD_PUBLIC_FEED; docs/setup.md, section 7)")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: overhead poll [-lat N -lon N] [-radius km] [-feeds a,b]   (OVERHEAD_AMQP)")
+		fmt.Fprintln(fs.Output(), "usage: overhead poll [-lat N -lon N] [-radius km] [-feeds a,b] [-public-feed a]   (OVERHEAD_AMQP)")
 		fs.PrintDefaults()
 	}
 	if err := parse(fs, args); err != nil {
@@ -58,9 +60,12 @@ func runPoll(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if *publicFeed != "" && !slices.Contains(strings.Split(settings.feeds, ","), *publicFeed) {
+		return usageError{fmt.Sprintf("overhead poll: -public-feed %q is not one of -feeds %q", *publicFeed, settings.feeds)}
+	}
 	pub := &bus.Publisher{URL: amqpURL(), Name: "overhead-poll"}
 	defer pub.Close()
-	rel := &relay.Relay{Run: relay.NewRun(time.Now()), Pub: pub}
+	rel := &relay.Relay{Run: relay.NewRun(time.Now()), Pub: pub, PublicFeed: *publicFeed}
 	slog.Info("polling", "run", rel.Run, "center", fmt.Sprintf("%.4f,%.4f", settings.center.Lat, settings.center.Lon),
 		"radius_km", settings.radius, "feeds", settings.feeds)
 
@@ -149,7 +154,11 @@ func runLive(ctx context.Context, args []string) error {
 	addr := fs.String("addr", env("OVERHEAD_ADDR", ":8090"), "listen address (OVERHEAD_ADDR)")
 	web := fs.String("web", "", "serve the screen's static files from this directory (web/out)")
 	factsPath := fs.String("facts", dataPath("facts.json"), "facts for the screen, as overhead-stats writes them")
-	public := fs.Bool("public", false, "commercial flights only (the README privacy rule for the public demo)")
+	public := fs.Bool("public", false, "the public instance (docs/setup.md, section 6): commercial flights from the public feed only, no routes or photos, a cap on streams")
+	publicRoutes := fs.Bool("public-routes", env("OVERHEAD_PUBLIC_ROUTES", "off") == "on",
+		"with -public, show routes: only with permission from adsbdb's route data owner (OVERHEAD_PUBLIC_ROUTES=on)")
+	publicPhotos := fs.Bool("public-photos", env("OVERHEAD_PUBLIC_PHOTOS", "off") == "on",
+		"with -public, show photos: only once planespotters' terms have been read (OVERHEAD_PUBLIC_PHOTOS=on)")
 	airport := fs.String("airport", env("OVERHEAD_AIRPORT", ""),
 		"follow this airport (ICAO: "+strings.Join(slices.Sorted(maps.Keys(live.Airports)), ", ")+"): its take-offs and landings only, with more about each (OVERHEAD_AIRPORT)")
 	weather := fs.Bool("weather", env("OVERHEAD_WEATHER", "on") != "off",
@@ -199,19 +208,27 @@ func runLive(ctx context.Context, args []string) error {
 	// than draining the queues with no one to serve.
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
-	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, Window: *w, Airport: followed, NearKm: nearKm}
-	// Today's counts (aircraft seen, landings and take-offs) are rebuilt from the history, not begun again at zero.
-	started := time.Now()
-	midnight := time.Date(started.Year(), started.Month(), started.Day(), 0, 0, 0, 0, time.Local)
-	replayed := 0
-	if err := history.Each(*histDir, midnight, started, func(e events.Position) { state.Update(e); replayed++ }); err != nil &&
-		!errors.Is(err, os.ErrNotExist) {
-		slog.Warn("replaying today's history", "dir", *histDir, "err", err)
+	state := &live.State{Center: c.center, RadiusKm: c.radius, Public: *public, PublicRoutes: *publicRoutes,
+		PublicPhotos: *publicPhotos, Window: *w, Airport: followed, NearKm: nearKm}
+	// Today's counts (aircraft seen, landings and take-offs) are rebuilt from the history, not begun again at zero. The
+	// history and the facts drawn from it are merged from every feed, so the public instance goes without them.
+	if !*public {
+		started := time.Now()
+		midnight := time.Date(started.Year(), started.Month(), started.Day(), 0, 0, 0, 0, time.Local)
+		replayed := 0
+		if err := history.Each(*histDir, midnight, started, func(e events.Position) { state.Update(e); replayed++ }); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			slog.Warn("replaying today's history", "dir", *histDir, "err", err)
+		}
+		slog.Info("today replayed from history", "positions", replayed, "took", time.Since(started).Round(time.Millisecond))
 	}
-	slog.Info("today replayed from history", "positions", replayed, "took", time.Since(started).Round(time.Millisecond))
-	srv := &live.Server{State: state}
+	srv := &live.Server{State: state, Public: *public}
 	if *web != "" {
-		srv.Web = http.FileServer(http.Dir(*web))
+		srv.Web = live.Static(*web)
+	}
+	positions, aircraft := bus.QueueLive, bus.QueueLiveAircraft
+	if *public {
+		positions, aircraft = bus.QueueLivePublic, bus.QueueLivePublicAircraft
 	}
 	pub := &bus.Publisher{URL: amqpURL(), Name: "overhead-live-asks"}
 	defer pub.Close()
@@ -219,7 +236,9 @@ func runLive(ctx context.Context, args []string) error {
 
 	var wg sync.WaitGroup
 	wg.Go(func() { srv.Run(ctx) })
-	wg.Go(func() { live.WatchFacts(ctx, *factsPath, state, 30*time.Second) })
+	if !*public {
+		wg.Go(func() { live.WatchFacts(ctx, *factsPath, state, 30*time.Second) })
+	}
 	if *weather {
 		wc := &live.WeatherClient{Base: "https://api.open-meteo.com", HTTP: &http.Client{Timeout: 20 * time.Second},
 			UserAgent: userAgent()}
@@ -234,10 +253,8 @@ func runLive(ctx context.Context, args []string) error {
 			wg.Go(func() { live.WatchMetar(ctx, mc, state, station, 10*time.Minute) })
 		}
 	}
-	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-live", bus.QueueLive, 500, consumer.Positions) })
-	wg.Go(func() {
-		_ = bus.Consume(ctx, amqpURL(), "overhead-live-aircraft", bus.QueueLiveAircraft, 100, consumer.Aircraft)
-	})
+	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-"+positions, positions, 500, consumer.Positions) })
+	wg.Go(func() { _ = bus.Consume(ctx, amqpURL(), "overhead-"+aircraft, aircraft, 100, consumer.Aircraft) })
 	wg.Go(func() {
 		every(ctx, 10*time.Minute, func() {
 			cov, pred := state.Coverage(), state.Predictions()
@@ -252,6 +269,7 @@ func runLive(ctx context.Context, args []string) error {
 		Addr:              *addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
 		// Streams outlive any write timeout; each write sets its own deadline. Requests end with ctx.
 		BaseContext: func(net.Listener) context.Context { return ctx },
 	}

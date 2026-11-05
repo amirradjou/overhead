@@ -31,8 +31,9 @@ type State struct {
 	Center   geo.Point
 	RadiusKm float64
 	MaxAge   time.Duration
-	// Public keeps only commercial flights in views (README privacy rule).
-	Public bool
+	// Public keeps only commercial flights in views (README privacy rule), without routes or photos unless PublicRoutes
+	// or PublicPhotos says their sources allow it (docs/setup.md, section 7), and only the planes a focused screen shows.
+	Public, PublicRoutes, PublicPhotos bool
 	// Window is the view the screen draws; the zero value is DefaultWindow.
 	Window Window
 	// Airport, when set, is the airport the screen follows; NearKm, when set, how close to the window (in a straight
@@ -46,6 +47,7 @@ type State struct {
 	day      string
 	today    map[string]struct{}
 	flights  map[string]*flight
+	sources  map[string]struct{}
 	received uint64
 	pruned   time.Time
 
@@ -73,6 +75,7 @@ func (s *State) init() {
 		s.pos, s.info = make(map[string]feeds.Position), make(map[string]events.Aircraft)
 		s.today, s.flights = make(map[string]struct{}), make(map[string]*flight)
 		s.arrivals, s.departures = make(map[string]struct{}), make(map[string]struct{})
+		s.sources = make(map[string]struct{})
 	}
 }
 
@@ -82,6 +85,9 @@ func (s *State) Update(e events.Position) {
 	defer s.mu.Unlock()
 	s.init()
 	s.received++
+	if e.Source != "" {
+		s.sources[e.Source] = struct{}{}
+	}
 	cur, had := s.pos[e.Hex]
 	if had && !e.At.After(cur.At) {
 		return
@@ -218,7 +224,8 @@ type View struct {
 	Planes   []Plane   `json:"planes"` // nearest first
 	// Today counts distinct aircraft seen since local midnight.
 	Today int `json:"today"`
-	// Sources are the feeds the planes in view came from, to credit on screen.
+	// Sources are the feeds that have reported since the start, to credit on screen: every one of them, whichever
+	// happened to have the freshest report of the planes shown at this moment.
 	Sources []string `json:"sources"`
 	// Facts are sentences about the history (overhead-stats) for the screen to show between planes.
 	Facts []string `json:"facts"`
@@ -229,6 +236,8 @@ type View struct {
 	Airport *AirportView `json:"airport,omitempty"`
 	// Weather is the weather at home, when a reading younger than weatherStale is held.
 	Weather *Weather `json:"weather,omitempty"`
+	// Public says this is the public instance: commercial flights only, seen by people who don't know the window.
+	Public bool `json:"public,omitempty"`
 }
 
 // LatLon is a point in the JSON the screen reads.
@@ -254,12 +263,11 @@ func (s *State) View(now time.Time) View {
 	v := View{
 		At: now, Center: LatLon{s.Center.Lat, s.Center.Lon}, RadiusKm: s.RadiusKm, Window: w,
 		Planes: []Plane{}, Sources: []string{}, Facts: append([]string{}, s.facts...),
-		Focused: s.Airport != nil || s.NearKm > 0, NearKm: s.NearKm,
+		Focused: s.Airport != nil || s.NearKm > 0, NearKm: s.NearKm, Public: s.Public,
 	}
 	today := now.Local().Format(time.DateOnly) == s.day
 	v.Weather = s.weatherNow(now)
 	lift := pressureFeet(v.Weather)
-	sources := make(map[string]bool)
 	for hex, p := range s.pos {
 		if now.Sub(p.At) > maxAge {
 			delete(s.pos, hex)
@@ -288,9 +296,16 @@ func (s *State) View(now time.Time) View {
 			if info.Route != nil && !plausible(g, info.Route) {
 				info.Route = nil // an old leg of a reused flight number
 			}
+			// A route still decides, unseen, whether a plane belongs to the followed airport.
+			route = info.Route
+			if s.Public && !s.PublicRoutes {
+				info.Route = nil
+			}
+			if s.Public && !s.PublicPhotos {
+				info.Photo = nil
+			}
 			pl.Info = &info
 			pl.ToDestinationKm, pl.ETAMin = eta(p, info.Route)
-			route = info.Route
 		}
 		if s.Airport != nil {
 			if at := s.Airport.classify(g, route); at != nil {
@@ -313,7 +328,6 @@ func (s *State) View(now time.Time) View {
 			pl.OffsetDeg = geo.AngleDiff(pl.BearingDeg, w.AzimuthDeg)
 		}
 		v.Planes = append(v.Planes, pl)
-		sources[p.Source] = true
 	}
 	slices.SortFunc(v.Planes, func(a, b Plane) int {
 		switch {
@@ -324,7 +338,7 @@ func (s *State) View(now time.Time) View {
 		}
 		return 0
 	})
-	for src := range sources {
+	for src := range s.sources {
 		v.Sources = append(v.Sources, src)
 	}
 	slices.Sort(v.Sources)
@@ -337,11 +351,18 @@ func (s *State) View(now time.Time) View {
 		if s.runway != "" && now.Sub(s.runwayAt) <= runwayFresh {
 			v.Airport.RunwayInUse = s.runway
 		}
-		if today {
+		switch {
+		case s.Public:
+			v.Airport.Uncounted = true
+		case today:
 			v.Airport.ArrivalsToday, v.Airport.DeparturesToday = len(s.arrivals), len(s.departures)
 		}
 	}
 	s.trackPredictions(v)
+	if s.Public && v.Focused {
+		// Most of a snapshot is planes a focused screen never draws: the board's and the sky's are all it needs.
+		v.Planes = slices.DeleteFunc(v.Planes, func(p Plane) bool { return !p.Focus && p.Airport == nil })
+	}
 	return v
 }
 
