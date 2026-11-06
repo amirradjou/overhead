@@ -113,7 +113,15 @@ export function place(a: Airport): { code: string; name: string } {
 
 /** The callsign, or the registration, or the address: something to call it by. */
 export function label(p: Plane): string {
-  return p.callsign || p.registration || p.info?.registration || p.hex.toUpperCase();
+  return p.callsign || p.registration || p.info?.registration || address(p);
+}
+
+/**
+ * The name of last resort: its ICAO address. A "~" marks a radar track relayed by air traffic control (TIS-B), whose
+ * address means nothing to anyone and names no airframe.
+ */
+export function address(p: Plane): string {
+  return p.hex.startsWith("~") ? "Unknown plane" : p.hex.toUpperCase();
 }
 
 /** The home pages of the sources the screen credits, which their terms ask to be named and linked. */
