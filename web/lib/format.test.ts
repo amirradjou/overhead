@@ -56,6 +56,12 @@ const porter = plane({
 });
 
 describe("credits", () => {
+  it("names a radar track with no identity in words, not by its address", () => {
+    expect(label(plane({ hex: "~2b4b9a", callsign: undefined }))).toBe("Unknown plane");
+    expect(label(plane({ hex: "c060b1", callsign: undefined }))).toBe("C060B1");
+    expect(label(plane({ hex: "c060b1", callsign: "POE2262" }))).toBe("POE2262");
+  });
+
   it("links every source to its home page", () => {
     expect(sourceHomes["adsb.fi"]).toBe("https://adsb.fi");
     expect(sourceHomes["adsb.lol"]).toBe("https://adsb.lol");

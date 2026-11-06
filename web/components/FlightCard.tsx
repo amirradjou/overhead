@@ -235,5 +235,7 @@ function withoutRoute(p: Plane, ap?: FollowedAirport): string {
   if (p.airport?.op === "arriving") return `${p.on_ground ? "Landed" : "Landing"} at ${name}`;
   if (p.airport?.op === "departing") return `Leaving ${name}`;
   if (p.airport) return `On the ground at ${name}`;
-  return p.near ? "Passing close by" : "Route unknown";
+  if (!p.near) return "Route unknown";
+  // A helicopter parked with its transponder on reports itself in the air, and is not passing anywhere.
+  return (p.speed_kt ?? 0) < 5 ? "Close by, not moving" : "Passing close by";
 }

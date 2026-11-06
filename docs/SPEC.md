@@ -137,8 +137,8 @@ IPv4, ca-central-1) left running would cost roughly US$25 a month, so a US$5 bud
 [overhead-window.netlify.app](https://overhead-window.netlify.app) is the same screen looking out of the same window, for
 people who have never seen it. The page itself is static, on Netlify. Its planes come over one stream from `live-public`,
 a second instance of the live API on the machine at home, reached through a tunnel. There is no server that stays on
-for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of a real
-evening, labelled as one, until the feed returns. A recording knows what came next, so it draws each plane on its true
+for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of real
+traffic, labelled as one, until the feed returns. A recording knows what came next, so it draws each plane on its true
 path between reports (`lib/replay.ts`), where live has to guess from the last one.
 
 The home screen says more. This is its test scene, with made-up traffic, routes and a placeholder photo:
@@ -224,7 +224,8 @@ What the open milestones wait for (sections of [setup.md](setup.md)):
   for the sighting log (3).
 - **M3, M4, M6**: seven consecutive days of history (the home stack stopped on 2026-10-30 and has collected again since
   2026-11-05 23:21 UTC, so 2026-11-12 at the earliest), then the AWS account and the Snowflake trial for one session (5).
-- **M5**: a Telegram bot (4); the hand-made list for the replay comes from the stored passes.
+- **M5**: the Telegram bot is wired (4). Still to come: seven stored days for the replay, with its hand-made list from
+  the stored passes, and one live heads-up timed at the phone.
 - **M7**: seven days of the page up (6), and four replies only the owner can get, which would let it show more (7).
 
 ## M0 results

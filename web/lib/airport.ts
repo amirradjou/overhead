@@ -1,6 +1,6 @@
 // The airport the screen follows (overhead live -airport): which planes a focused screen shows, and the words for a
 // flight landing at it or taking off from it, seen from a window that may look down on it.
-import { altFt, place } from "./format";
+import { address, altFt, place } from "./format";
 import { duration } from "./progress";
 import type { FollowedAirport, Plane, View, Window } from "./types";
 
@@ -190,7 +190,7 @@ function boardFlight(p: Plane): string {
   const iata = p.info?.route?.flight_iata?.match(/^([A-Z][A-Z0-9]|[0-9][A-Z])(\d+[A-Z]?)$/);
   if (iata) return `${iata[1]} ${iata[2]}`;
   if (p.callsign && /^[A-Z]{3}\d/.test(p.callsign)) return p.callsign;
-  return p.info?.registration || p.registration || p.callsign || p.hex.toUpperCase();
+  return p.info?.registration || p.registration || p.callsign || address(p);
 }
 
 /**

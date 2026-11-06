@@ -26,17 +26,18 @@ const { values: args } = parseArgs({
 const webOut = resolve(import.meta.dirname, "..", "out");
 const size = { width: 1920, height: 1080 };
 
-// POE2262's landing on runway 26, as seconds into the recording: announced at the window's edge, on final, down, and
-// rolled out. The page's clock is set so it happens in the last of the afternoon's light.
-const landing = { from: 326, to: 406, clock: "2026-11-05T21:23:00Z" };
+// POE2722's landing on runway 26, as seconds into the recording: announced at the window's edge, on final, down, and
+// rolled out. The page's clock is the moment it really happened, so the light and the clouds are that moment's.
+const recorded = "2026-11-06T17:56:19Z";
+const landing = { from: 150, to: 222, clock: recorded };
 // 33.33 frames a second is what a GIF can truly hold: its delays are whole hundredths of a second, here 3.
 const gif = { speed: 5, fps: 100 / 3, fadeFrames: 20, width: 960 };
 const stills = [
-  { name: "screen-day", clock: "2026-11-05T17:25:00Z", at: 372 },
-  { name: "screen-dusk", clock: "2026-11-05T21:55:00Z", at: 372 },
-  { name: "screen-night", clock: "2026-11-06T00:30:00Z", at: 548 },
+  { name: "screen-day", clock: recorded, at: 194 },
+  { name: "screen-dusk", clock: "2026-11-06T21:58:00Z", at: 194 },
+  { name: "screen-night", clock: "2026-11-07T00:30:00Z", at: 1300 },
 ];
-const phone = { name: "phone", clock: "2026-11-05T17:25:00Z", at: 372, width: 390, height: 844, dpr: 2 };
+const phone = { name: "phone", clock: recorded, at: 194, width: 390, height: 844, dpr: 2 };
 
 /** The page's own clock, timers and animations, moved only by __tick: nothing in the page runs on real time. */
 const virtualTime = (start) => `(() => {
@@ -61,7 +62,8 @@ const virtualTime = (start) => `(() => {
   const seek = () => {
     for (const a of document.getAnimations()) {
       if (!started.has(a)) { started.set(a, lastFrame); a.pause(); }
-      a.currentTime = now - started.get(a);
+      // The clouds' drift is too slow to see, even at this speed, and would change the whole sky in every frame.
+      if (a.animationName !== "cloud-drift") a.currentTime = now - started.get(a);
     }
   };
   window.__tick = async (ms) => {
@@ -164,10 +166,12 @@ async function openBrowser() {
     });
   return {
     send,
-    close() {
+    async close() {
       ws.close();
       proc.kill();
-      rmSync(profile, { recursive: true, force: true });
+      // It writes to its profile as it shuts down: removed too soon, that fails and stops every picture still to come.
+      await new Promise((r) => proc.once("exit", r));
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }
@@ -203,7 +207,7 @@ async function openPage(browser, port, { clock, width = size.width, height = siz
   let t = 0;
   return {
     /** Moves on to s seconds into the recording, a snapshot at a time, so trails build up as they would. */
-    async advanceTo(s, step = 500) {
+    async advanceTo(s, step = 1000) {
       while (t < s * 1000) {
         const dt = Math.min(step, s * 1000 - t);
         await evaluate(`window.__tick(${dt})`);
@@ -294,7 +298,7 @@ for (const [, job] of jobs) {
   try {
     await job(browser);
   } finally {
-    browser.close();
+    await browser.close();
   }
 }
 server.close();

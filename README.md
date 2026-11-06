@@ -6,19 +6,19 @@ The planes you can see from your window, on a spare screen or TV. It reads free 
 
 ![A Porter Dash 8 comes in over the harbour, touches down on the drawn runway at Billy Bishop and taxis, while the caption follows it](docs/images/demo.gif)
 
-<sub>A real landing at Billy Bishop from the page's recording, at 5× speed, under the sky of a late afternoon.</sub>
+<sub>A real landing at Billy Bishop, in that moment's real light and cloud, at 5× speed.</sub>
 
 ## It matches the view
 
 | Outside | On the screen |
 |---|---|
-| ![The view from the window: Toronto's harbour, the islands and the runway](docs/images/window.jpg) | ![The same view drawn on screen by day, with a Dash 8 on the runway](docs/images/screen-day.jpg) |
+| ![The view from the window: Toronto's harbour, the islands and the runway](docs/images/window.jpg) | ![The same view drawn on screen by day under broken cloud, with a Dash 8 on the runway](docs/images/screen-day.jpg) |
 
 The sun, moon and stars are worked out for the moment you look. The clouds come from the weather.
 
 | Dusk | Night |
 |---|---|
-| ![The screen at dusk](docs/images/screen-dusk.jpg) | ![The screen at night: a departing flight's navigation lights over the lit runway](docs/images/screen-night.jpg) |
+| ![The screen at dusk](docs/images/screen-dusk.jpg) | ![The screen at night: a departing flight's navigation lights high over the lit runway](docs/images/screen-night.jpg) |
 
 | At home, with routes and photos (test data) | On a phone |
 |---|---|
