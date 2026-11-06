@@ -12,9 +12,17 @@ export type Status = "connecting" | "live" | "reconnecting" | "replay";
 const silence = 15_000;
 
 /**
+ * Where to read the API from. A build that names its API keeps to it: the public page must not show whatever a crafted
+ * `?api=` link points it at, under its own address.
+ */
+export function apiBase(built: string | undefined, search: string): string {
+  return built || (new URLSearchParams(search).get("api") ?? "");
+}
+
+/**
  * The live picture from `overhead live`. The API is on the page's own origin unless the build says otherwise
  * (NEXT_PUBLIC_OVERHEAD_API, for a page hosted apart from it) or the address bar does (`?api=http://host:8090`, handy
- * with `pnpm dev`).
+ * with `pnpm dev`; see apiBase).
  *
  * A page built with NEXT_PUBLIC_OVERHEAD_REPLAY=1 plays its recording while the feed is away, and returns to live the
  * moment the feed does; the screen says which it is showing. `?replay` plays the recording on demand. A TV's page
@@ -26,7 +34,7 @@ export function useLiveView(): { view: View | null; status: Status } {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const base = params.get("api") ?? process.env.NEXT_PUBLIC_OVERHEAD_API ?? "";
+    const base = apiBase(process.env.NEXT_PUBLIC_OVERHEAD_API, window.location.search);
     const onDemand = params.has("replay");
     const canReplay = onDemand || process.env.NEXT_PUBLIC_OVERHEAD_REPLAY === "1";
     let source: EventSource | null = null;

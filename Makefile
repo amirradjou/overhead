@@ -41,4 +41,5 @@ OVERHEAD_SITE ?= overhead-window
 
 site:
 	cd web && NEXT_PUBLIC_OVERHEAD_API=$(OVERHEAD_PUBLIC_API) NEXT_PUBLIC_OVERHEAD_REPLAY=1 pnpm build
+	sed -i 's|OVERHEAD_PUBLIC_API|$(OVERHEAD_PUBLIC_API)|' web/out/_headers
 	cd web && netlify deploy --prod --dir out --site $(OVERHEAD_SITE)
