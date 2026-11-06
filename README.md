@@ -4,10 +4,27 @@ The planes you can see from your window, live: a calm, screensaver-like view of 
 screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
 community flight-tracking feeds.
 
-> **Status (2026-10-30): M0–M6 built and merged (PRs #2–#13); the whole stack runs from one `docker compose up -d`.
-> M0 and M1 meet their "Done when". M2–M7 wait on things only the owner can provide (the window's measurements, a TV
-> device, a Telegram bot, AWS and Snowflake accounts, a server): [docs/setup.md](docs/setup.md) says how to provide
-> each, and [Milestones](#milestones) what each still needs.** This README is the spec.
+**See it: [overhead.amirradjou.com](https://overhead.amirradjou.com).** This is a real window, on a high floor over
+Toronto's harbour, with Billy Bishop airport on the island opposite.
+
+| The window | The screen |
+|---|---|
+| ![The view from the window: Toronto's harbour, the islands and the runway](docs/images/window.jpg) | ![The screen by day, with the harbour drawn from OpenStreetMap and a Porter Dash 8 landing on runway 26](docs/images/screen-day.jpg) |
+
+The planes are drawn where you would see them through the glass, so a landing touches down on the drawn runway. That is
+a real landing, from the page's recording, played at 13:30: the sun, the moon and the stars are worked out for the moment
+you look, and the clouds come from the weather.
+
+It is one small event-driven system, in Go, with RabbitMQ between the parts: a poller, an enrichment worker with a
+dead-letter queue, a history writer, a heads-up service and two instances of the live API, plus a Next.js screen that
+runs for days in a TV browser as old as Chromium 79, and a DuckDB job for the facts. Terraform can take the history
+through S3 and Snowpipe into Snowflake for a test on AWS. The whole stack runs from one `docker compose up -d`.
+
+> **Status (2026-11-05): M0 and M1 meet their "Done when". M2–M6 are built and wait on things only the owner can
+> provide (the window's measurements, a TV device, AWS and Snowflake accounts): [docs/setup.md](docs/setup.md) says how
+> to provide each, and [Milestones](#milestones) what each still needs. M7, the public page, is built and running.**
+> There is no server behind the public page: its live feed comes from the same small stack at home, so it is live when
+> that machine is on, and plays a labelled recording when it is not. This README is the spec.
 
 ## What it is
 
@@ -26,16 +43,17 @@ it, everything it saw is kept, so it can answer questions later, such as when an
 ## Data sources
 
 Personal, non-commercial use; every source is credited on screen, and linked where a pointer exists (adsb.fi asks for
-a link to its home page). Terms and limits were checked on 2026-10-29: overhead
+a link to its home page). What the public page may use is narrower: see [The public page](#the-public-page). Terms and
+limits were checked on 2026-10-29 and 2026-11-05: overhead
 asks adsb.fi every 5 s and adsb.lol every 15 s (one request every 5 s drew 429s within minutes), sends a User-Agent
 naming the project, backs off after errors and honours Retry-After.
 
 | Source | Gives | Notes |
 |---|---|---|
-| adsb.lol | live positions in a radius | free, no key, unfiltered; limits are "dynamic", and a key (for feeders) is planned |
+| adsb.lol | live positions in a radius | free, no key, unfiltered, under the ODbL; limits are "dynamic", and a key (for feeders) is planned |
 | adsb.fi | live positions in a radius | free for personal, non-commercial use; one request a second; credit with a link |
 | airplanes.live | live positions in a radius | free for non-commercial use, about one request a second; now answers 403 until the project is approved by email, so it is off by default |
-| adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data may not be copied into other databases, so routes stay in the day-long cache and never reach the history |
+| adsbdb | aircraft (type, registration, operator) by ICAO address; route by callsign | free, no key; one call returns both; route data "may not be copied, published, or incorporated into other databases" without its owner's permission, so routes stay in the day-long cache, never reach the history and are not on the public page |
 | planespotters.net | a photo of that exact airframe | photographer credit on every photo, linked to its photo page where a pointer exists; hotlinked, never proxied or stored; terms to read in a browser (the page refuses scripted fetches) |
 | Open-Meteo | the weather at home: cloud cover by layer, wind, visibility | free for non-commercial use, no key, credited and linked; asked once every 10 minutes by the live API whatever the number of screens; `OVERHEAD_WEATHER=off` stops it |
 | aviationweather.gov | the followed airport's weather report (METAR): its cloud layers, gusts and pressure | free, no key; asked once every 10 minutes; preferred to the model where both speak, since on 2026-10-30 Open-Meteo drew a nearly clear sky under the broken deck both Toronto airports reported; `OVERHEAD_METAR` names another station |
@@ -122,8 +140,8 @@ the history when the live API restarts.
     (RabbitMQ, poll, enrich, history, live, headsup and the facts job), restarting on boot. The TV shows it full
     screen, best from a Raspberry Pi or HDMI stick in Chromium kiosk mode; the TV's own browser is best effort, and its
     auto power-off timer must be off. The machine must never sleep: a desktop's automatic suspend leaves a gap in the
-    history. The live API stays on the home network (it serves home's coordinates). The public demo is the same stack
-    in `-public` mode on the shared Hetzner box, centred on a public spot by the airport.
+    history. The live API stays on the home network (it shows every plane, private ones too). The public page is a
+    second instance on the same machine: see [The public page](#the-public-page).
 
 ## Event flow (RabbitMQ)
 
@@ -141,13 +159,53 @@ Why a message broker for one house: the three consumers want different things (t
 complete batches, alerts exactly one message) and the free enrichment APIs need back-pressure. RabbitMQ runs as a
 container next to the poller; Amazon MQ would cost more than the rest of the project.
 
-Privacy rule for anything public: some private aircraft owners ask not to be identified, so the public demo shows
+Privacy rule for anything public: some private aircraft owners ask not to be identified, so the public page shows
 commercial flights only and never registrations or owners of private aircraft.
 
-Cost: nothing that runs all the time costs money beyond the home box and the shared Hetzner server. The Snowflake trial
+Cost: nothing that runs all the time costs money beyond the home box; the public page is free static hosting and a
+free tunnel. The Snowflake trial
 is time-limited and used once, for M3, M4 and M6, after a week of history exists locally; the warehouse is X-Small
 with a 60 s auto-suspend. AWS goes up for that check and down the same day: the Fargate task (0.5 vCPU, 1 GB, a public
 IPv4, ca-central-1) left running would cost roughly US$25 a month, so a US$5 budget alert comes first.
+
+## The public page
+
+[overhead.amirradjou.com](https://overhead.amirradjou.com) is the same screen looking out of the same window, for
+people who have never seen it. The page itself is static, on Netlify. Its planes come over one stream from `live-public`,
+a second instance of the live API on the machine at home, reached through a tunnel. There is no server that stays on
+for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of a real
+evening, labelled as one, until the feed returns.
+
+The home screen says more. This is its test scene, with made-up traffic, routes and a placeholder photo:
+
+![The home screen's test scene: the flight card with its route, photo and approach profile, and the airport's board](docs/images/home-test-scene.jpg)
+
+The public instance is one more consumer on the bus, with its own queues: nothing it does can reach the home screen or
+add a request to any feed. It shows less, because the sources allow less ([docs/setup.md](docs/setup.md#7-what-the-sources-allow-on-a-public-page)
+has their words):
+
+| | Home screen | Public page |
+|---|---|---|
+| Planes | every aircraft | commercial flights only |
+| Positions | adsb.fi and adsb.lol, merged | adsb.lol's own reports (ODbL), unmerged |
+| Routes and photos | yes | no: adsbdb's routes need its owner's permission, and planespotters' terms are still unread |
+| Facts and the day's counts | from the history | none: they are drawn from merged data, and a restart would make the counts untrue |
+| Reachable from | the home network | the internet, through a tunnel to one port |
+| Runs with | `.env`, the data volume | settings named one by one, no secrets, no volume, a read-only filesystem, no capabilities |
+
+The work per tick does not grow with the viewers. Each snapshot is encoded once, as a standalone deflate block that any
+stream can carry whatever it was sent before, so every viewer shares one copy and `/api/now` answers from it too.
+Measured on 2026-11-05 with 198 streams open at once: 16 MB of memory, about 0.1% of a core, and the poller's rate
+unchanged. Past 200 streams the instance answers 503, and the page plays its recording for whoever is turned away. A
+viewer costs 0.7 KB/s, down from the 24 KB/s of the home stream, by leaving out the planes a focused screen never
+draws and compressing the rest.
+
+| At night | On a phone |
+|---|---|
+| ![The screen at night: the runway's edge lights, the shore's lamps and a departing flight's navigation lights](docs/images/screen-night.jpg) | <img src="docs/images/phone.jpg" alt="The public page on a phone" width="240"> |
+
+The recording ([web/public/replay.json](web/public/replay.json)) is published data, so `pnpm record-replay` refuses
+anything but the public instance's stream: no other feed's data, no private flights, no routes, no photos.
 
 ## Run it
 
@@ -164,6 +222,7 @@ The whole stack on an always-on machine (README item 10): put your home and wind
 ```sh
 docker compose up -d                 # RabbitMQ, poll, enrich, history, live, headsup and the facts job
 open http://<this machine>:8090      # on the TV; the RabbitMQ UI is on http://localhost:15673 (overhead / overhead)
+docker compose --profile public up -d   # also the public instance, on 127.0.0.1:8091 (docs/setup.md, section 6)
 ```
 
 For development, the same event pipeline (M1) with the commands on the host, each in its own terminal:
@@ -277,16 +336,16 @@ vehicles (ADS-B emitter categories C1–C7) are left out: they are not aircraft.
 | M4 🔶 built | Facts: about the plane in view and between planes | on three days of history, every figure a fact shows equals the same figure recomputed from Snowflake's passes (`02_passes.sql`), not from the same DuckDB query; while the feed is up, the caption is never empty between planes |
 | M5 🔶 built | Heads-up on the phone (Telegram) | replaying seven stored days sends exactly the heads-ups on a list made by hand from the passes (each emergency squawk, low pass over the window, rare or first-seen type), none twice; one live heads-up reaches the phone at least two minutes before its plane enters the window |
 | M6 🔶 built | Terraform for AWS + Snowflake | from a clean account, `make up` brings everything up and the Fargate task's batches reach Snowflake; `make down` leaves nothing (`terraform state list` empty, bucket gone); the test costs under US$5 |
-| M7 | Public demo | seven days on the shared Hetzner box without a restart: centred on a public spot by the airport, `-public` on, every plane shown has an airline callsign, home's coordinates appear in no response, the credits link to each source and each photo to its planespotters page, and the feeds see the same request rate with 1 viewer or 50 |
+| M7 🔶 built | Public page | over seven days the page always answers, live or plainly labelled as a recording: every plane shown has an airline callsign, the only feed credited and used is one whose licence allows it, no route or photo appears in any response or in the recording, the credits link to each source, and the feeds see the same request rate with 1 viewer or 200 — **built and load-tested 2026-11-05 (198 streams: 16 MB, poll rate unchanged); the seven days are still to run** |
 
 What the open milestones wait for (sections of [docs/setup.md](docs/setup.md)):
 
 - **M2**: the window measured (1), the TV device on a machine that never sleeps (2), and one or two clear evenings
   for the sighting log (3).
-- **M3, M4, M6**: seven consecutive days of history (the home stack has been collecting since 2026-10-30 12:48 UTC,
-  so 2026-11-06 at the earliest), then the AWS account and the Snowflake trial for one session (5).
+- **M3, M4, M6**: seven consecutive days of history (the home stack stopped on 2026-10-30 and has collected again since
+  2026-11-05 23:21 UTC, so 2026-11-12 at the earliest), then the AWS account and the Snowflake trial for one session (5).
 - **M5**: a Telegram bot (4); the hand-made list for the replay comes from the stored passes.
-- **M7**: the server (6) and the checks before anything is public (7).
+- **M7**: seven days of the page up (6), and four replies only the owner can get, which would let it show more (7).
 
 ## Code layout
 
@@ -300,7 +359,7 @@ What the open milestones wait for (sections of [docs/setup.md](docs/setup.md)):
 | `internal/history` | one-minute batches to disk or S3, `verify` |
 | `internal/headsup` | heads-up rules, the ledger, Telegram, replay |
 | `internal/geo` | distance, bearing, elevation above the horizon |
-| `web/` | the screen: Next.js static export, served by `overhead live -web` |
+| `web/` | the screen: Next.js static export, served by `overhead live -web` and, as the public page, by Netlify; `web/public/replay.json` is its recording |
 | `analysis/` | passes (`passes.sql`) and facts with DuckDB, as the `overhead-stats` job |
 | `snowflake/`, `terraform/` | M3's SQL and M6's infrastructure |
 | `docs/setup.md` | what the owner provides: the window, the TV, the bot, the accounts, the server |
@@ -336,3 +395,15 @@ The whole pipeline (poll, enrich, history, live) ran round Toronto Pearson on 20
 | API calls | 131 calls for 58 new aircraft across both enrich runs: 2.26 per new plane (cache hits: 239) |
 | Dead letters | 5 jobs, all with the callsign "@@@@@@@@" that readsb prints when it cannot decode one; adsbdb answered 400. Such callsigns are now dropped at the feed (7e03ff2) |
 | Poller | 921 polls, longest gap 5 s |
+
+## Licence
+
+The code is under the [MIT licence](LICENSE). The data this repository holds keeps its own:
+
+- `web/lib/scenery/` is extracted from [OpenStreetMap](https://www.openstreetmap.org/copyright), © OpenStreetMap
+  contributors, available under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).
+- `web/public/replay.json` contains information from [adsb.lol](https://adsb.lol), made available under the
+  [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/), and aircraft details from
+  [adsbdb](https://www.adsbdb.com). The recording is offered under the same licence.
+- The font, Atkinson Hyperlegible Next, is under the SIL Open Font License, bundled from its npm package.
+- `docs/images/window.jpg`, a photograph, is the author's and is not covered by the MIT licence.
