@@ -937,6 +937,15 @@ a {
   }
 }
 
+/* Clouds are laid out in fractions of the screen for a wide one: upright, they would squeeze into columns. Drawn as wide
+   as a landscape screen, the sides out of sight, they keep their shape. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .clouds {
+    left: -120vw;
+    width: 340vw;
+  }
+}
+
 /* Phones and narrow windows. */
 @media (max-width: 900px) {
   html {
@@ -948,6 +957,10 @@ a {
   .overview,
   .credits,
   .card-photo {
+    display: none;
+  }
+  /* The caption already names the plane it covers. */
+  .craft.is-featured .craft-label {
     display: none;
   }
   /* A phone is no TV: the public page still names its sources, as their terms ask, and the board makes room. */
