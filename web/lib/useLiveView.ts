@@ -11,6 +11,10 @@ export type Status = "connecting" | "live" | "reconnecting" | "replay";
 // never sit on a frozen picture.
 const silence = 15_000;
 
+// A first-time visitor waits no longer than this for a stream that neither answers nor fails, as one through a tunnel
+// may while the machine behind it sleeps, before the page plays its recording.
+const patience = 5_000;
+
 /**
  * Where to read the API from. A build that names its API keeps to it: the public page must not show whatever a crafted
  * `?api=` link points it at, under its own address.
@@ -97,6 +101,9 @@ export function useLiveView(): { view: View | null; status: Status } {
     }
 
     open();
+    const firstLook = window.setTimeout(() => {
+      if (!everLive) void startReplay();
+    }, patience);
     const watchdog = window.setInterval(() => {
       if (Date.now() - lastMessage > silence) {
         setStatus((s) => (s === "replay" ? s : "reconnecting"));
@@ -106,6 +113,7 @@ export function useLiveView(): { view: View | null; status: Status } {
       }
     }, 5_000);
     return () => {
+      window.clearTimeout(firstLook);
       window.clearInterval(watchdog);
       stopReplay();
       source?.close();
