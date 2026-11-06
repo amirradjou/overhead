@@ -1,4 +1,4 @@
--- overhead history in Snowflake (README: History, M3). Run once, in order, as ACCOUNTADMIN on the trial; M6's
+-- overhead history in Snowflake (docs/SPEC.md: History, M3). Run once, in order, as ACCOUNTADMIN on the trial; M6's
 -- Terraform makes the same objects. Replace <bucket>, <prefix> and <role-arn> with the values Terraform prints.
 -- Cost guard: one X-Small warehouse that suspends after a minute idle.
 

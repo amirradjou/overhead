@@ -1,4 +1,4 @@
-// Package events holds the messages that travel over RabbitMQ (README: Event flow). Their JSON forms are the wire
+// Package events holds the messages that travel over RabbitMQ (docs/SPEC.md: Event flow). Their JSON forms are the wire
 // format, and a position's is also the history row.
 package events
 

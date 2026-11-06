@@ -1,5 +1,5 @@
 // Package headsup sends a message to the phone when something worth getting up for is about to pass the window
-// (README: Heads-up): an emergency squawk, a rare airframe, a low pass right over the window, a type never seen
+// (docs/SPEC.md: Heads-up): an emergency squawk, a rare airframe, a low pass right over the window, a type never seen
 // here before. Each aircraft gets each notice once a day.
 package headsup
 

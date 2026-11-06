@@ -10,7 +10,7 @@ import (
 
 // Window is the view from home: the direction the window faces, how wide a slice of sky it shows, the lowest angle
 // above the horizon you can see over whatever stands opposite, and the highest, where the window's top edge cuts the
-// sky off (seen from where you sit; README: Window setup).
+// sky off (seen from where you sit; docs/SPEC.md: Window setup).
 type Window struct {
 	AzimuthDeg      float64 `json:"azimuth_deg"`
 	FOVDeg          float64 `json:"fov_deg"`

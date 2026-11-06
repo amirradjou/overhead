@@ -20,7 +20,7 @@ provider "aws" {
 }
 
 # Credentials from the usual SNOWFLAKE_* environment (SNOWFLAKE_ORGANIZATION_NAME, SNOWFLAKE_ACCOUNT_NAME,
-# SNOWFLAKE_USER, SNOWFLAKE_PASSWORD or a key); see README.
+# SNOWFLAKE_USER, SNOWFLAKE_PASSWORD or a key); see docs/setup.md.
 provider "snowflake" {
   role = "ACCOUNTADMIN"
 }

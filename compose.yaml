@@ -1,4 +1,4 @@
-# The whole stack on one always-on machine (README: Where it runs): `docker compose up -d`, then open
+# The whole stack on one always-on machine (docs/SPEC.md: Where it runs): `docker compose up -d`, then open
 # http://<this machine>:8090 on the TV. Settings come from .env (see .env.example): home, the window, the time zone.
 # For development with the commands on the host, start only the broker: `docker compose up -d rabbitmq`.
 name: overhead

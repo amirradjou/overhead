@@ -1,4 +1,4 @@
-// Package bus is overhead's RabbitMQ plumbing: the exchanges and queues of the README's event flow, a publisher that
+// Package bus is overhead's RabbitMQ plumbing: the exchanges and queues of the spec's event flow, a publisher that
 // waits for the broker's confirms, and a consumer loop that reconnects.
 package bus
 
@@ -13,7 +13,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// Exchanges, queues and routing keys (README: Event flow).
+// Exchanges, queues and routing keys (docs/SPEC.md: Event flow).
 const (
 	ExchangePositions = "positions" // topic: position events
 	// fanout: what the public instance may show, one feed's own reports (relay.PublicFeed)

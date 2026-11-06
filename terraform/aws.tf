@@ -192,7 +192,7 @@ resource "aws_ecs_service" "overhead" {
   }
 }
 
-# --- Cost guard: an alert before anything else costs money (README: Cost) ----------------------------------------
+# --- Cost guard: an alert before anything else costs money (docs/SPEC.md: Cost) ----------------------------------------
 
 resource "aws_budgets_budget" "test" {
   count        = var.budget_email == "" ? 0 : 1

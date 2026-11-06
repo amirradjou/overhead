@@ -1,4 +1,4 @@
--- One row per pass: an aircraft's positions with no gap of more than ten minutes between them (README: History).
+-- One row per pass: an aircraft's positions with no gap of more than ten minutes between them (docs/SPEC.md: History).
 -- Reads the `positions` view (one row per position event) and the variables home_lat and home_lon.
 -- DuckDB dialect; M3 runs the same model on Snowflake over the table Snowpipe loads.
 WITH marked AS (

@@ -1,4 +1,4 @@
-# One image for every overhead command (README: Infra): the Go binary plus the screen's static files.
+# One image for every overhead command (docs/SPEC.md: Infra): the Go binary plus the screen's static files.
 #   docker build -t overhead .
 #   docker run --rm overhead poll        # or enrich, live -web /web, history -s3 s3://..., headsup
 

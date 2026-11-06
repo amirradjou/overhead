@@ -41,7 +41,7 @@ variable "snowflake" {
 }
 
 variable "budget_email" {
-  description = "Where the US$5 monthly cost alert goes (README: Cost). make up refuses to run without it."
+  description = "Where the US$5 monthly cost alert goes (docs/SPEC.md: Cost). make up refuses to run without it."
   type        = string
   default     = ""
 }

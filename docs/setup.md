@@ -2,7 +2,7 @@
 
 overhead runs without any of this: `docker compose up -d` with no `.env` watches the 60 km circle round Toronto
 Pearson and shows the whole sky. Each section below makes one more part real, and the milestones that are still open
-(README: Milestones) need them. Each says what to get, where it goes and how to check it.
+([SPEC: Milestones](SPEC.md#milestones)) need them. Each says what to get, where it goes and how to check it.
 
 Settings and secrets go in two places, never in the repo:
 
@@ -55,7 +55,7 @@ Measure from where you usually sit, since the window shows a different slice of 
 
 **Check:** the next time a plane crosses the window, it should be on the screen at the same place. If planes are
 always a little to one side, move `OVERHEAD_WINDOW_AZ` by that many degrees; if they appear on the screen while
-still hidden behind the roofs, raise `OVERHEAD_WINDOW_MIN_EL`. (README item 9's setup view, a full-sky strip to do
+still hidden behind the roofs, raise `OVERHEAD_WINDOW_MIN_EL`. (the [SPEC](SPEC.md#what-it-needs-to-do)'s item 9, a setup view, a full-sky strip to do
 this against every plane round home, is not built yet.)
 
 The live API serves home's coordinates and every plane, private ones too, so port 8090 stays on the home network. Only
@@ -136,7 +136,7 @@ phone. If the token leaks, `/revoke` it in BotFather and put the new one in `.en
 
 ## 5. AWS and Snowflake
 
-A test, not a home for the stack (README: Cost): open both accounts on the same day, once `data/history` holds seven
+A test, not a home for the stack ([SPEC: Cost](SPEC.md#event-flow-rabbitmq)): open both accounts on the same day, once `data/history` holds seven
 consecutive days, run M3, M4 and M6 in one session, then `make down`. The Snowflake trial lasts 30 days and needs no
 card; the AWS parts cost a few dollars at most, and the US$5 budget alert is the first thing `make up` creates.
 
@@ -256,7 +256,7 @@ Read on 2026-11-05. This is a reading of their terms, not legal advice.
 | planespotters.net | its pages refuse scripted reads (403), so its terms are unread | no photos |
 | Open-Meteo | free for "Private or non-profit websites or apps that do not have subscriptions or advertising"; "You must include a link next to any location Open-Meteo data are displayed" and link the licence (CC BY 4.0) | credited with both links, and says the clouds are drawn from it |
 | aviationweather.gov | "rate limited to 100 requests per minute"; "Set a custom user agent"; US government data, public domain | one request every 10 minutes, with a user agent |
-| OpenStreetMap | "If you are distributing OSM in data form, please name and link directly to the license(s)" | "Map © OpenStreetMap contributors (ODbL)" on screen; the extract's licence in the README |
+| OpenStreetMap | "If you are distributing OSM in data form, please name and link directly to the license(s)" | "Map © OpenStreetMap contributors (ODbL)" on screen; the extract's licence in [NOTICE.md](../NOTICE.md) |
 
 **What only you can do.** Each one lets the page show more, or makes what it shows firmer. Nothing here is urgent: the
 page keeps to what is plainly allowed until you have an answer.

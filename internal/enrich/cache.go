@@ -7,7 +7,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// Cache lifetimes (README: routes for a day, airframes for a month). "Unknown" answers are cached too, or every poll
+// Cache lifetimes (docs/SPEC.md: routes for a day, airframes for a month). "Unknown" answers are cached too, or every poll
 // of an aircraft adsbdb doesn't know would ask again.
 const (
 	airframeTTL     = 30 * 24 * time.Hour
