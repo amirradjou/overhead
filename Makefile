@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt up down image
+.PHONY: build test lint fmt up down image site
 
 build:
 	go build -o bin/overhead ./cmd/overhead
@@ -33,3 +33,12 @@ image:
 	aws ecr get-login-password | docker login --username AWS --password-stdin $${repo%%/*} && \
 	docker build --build-arg VERSION=$$(git describe --always --dirty) -t $$repo:latest . && \
 	docker push $$repo:latest
+
+# The public page (docs/setup.md, section 6): the screen as a static site that reads the public instance's stream and
+# plays its recording while that is away. OVERHEAD_SITE is the Netlify site.
+OVERHEAD_PUBLIC_API ?= https://framework.tail420820.ts.net:8443
+OVERHEAD_SITE ?= overhead-window
+
+site:
+	cd web && NEXT_PUBLIC_OVERHEAD_API=$(OVERHEAD_PUBLIC_API) NEXT_PUBLIC_OVERHEAD_REPLAY=1 pnpm build
+	cd web && netlify deploy --prod --dir out --site $(OVERHEAD_SITE)

@@ -15,19 +15,25 @@ import (
 
 // Exchanges, queues and routing keys (README: Event flow).
 const (
-	ExchangePositions   = "positions"    // topic: position events
-	ExchangeAircraft    = "aircraft"     // fanout: enrichment results
-	ExchangeEnrich      = "enrich"       // direct: enrichment jobs
-	ExchangeEnrichRetry = "enrich.retry" // direct: jobs waiting out a retry delay
-	ExchangeEnrichDead  = "enrich.dead"  // fanout: jobs that failed MaxAttempts times
+	ExchangePositions = "positions" // topic: position events
+	// fanout: what the public instance may show, one feed's own reports (relay.PublicFeed)
+	ExchangePositionsPublic = "positions.public"
+	ExchangeAircraft        = "aircraft"     // fanout: enrichment results
+	ExchangeEnrich          = "enrich"       // direct: enrichment jobs
+	ExchangeEnrichRetry     = "enrich.retry" // direct: jobs waiting out a retry delay
+	ExchangeEnrichDead      = "enrich.dead"  // fanout: jobs that failed MaxAttempts times
 
 	QueueLive         = "live"
 	QueueHistory      = "history"
 	QueueAlerts       = "alerts"
 	QueueLiveAircraft = "live.aircraft"
-	QueueEnrich       = "enrich"
-	QueueEnrichRetry  = "enrich.retry"
-	QueueEnrichDead   = "enrich.dead"
+	// The public instance of the live API has its own pair, so it is one more consumer: nothing it does can take
+	// messages from, or slow, the home screen's. Its positions come from the public exchange, not the merged picture.
+	QueueLivePublic         = "live.public"
+	QueueLivePublicAircraft = "live.public.aircraft"
+	QueueEnrich             = "enrich"
+	QueueEnrichRetry        = "enrich.retry"
+	QueueEnrichDead         = "enrich.dead"
 
 	KeyPosition = "position"
 	KeyJob      = "job"
@@ -53,6 +59,7 @@ const (
 func Declare(ch *amqp.Channel) error {
 	exchanges := []struct{ name, kind string }{
 		{ExchangePositions, amqp.ExchangeTopic},
+		{ExchangePositionsPublic, amqp.ExchangeFanout},
 		{ExchangeAircraft, amqp.ExchangeFanout},
 		{ExchangeEnrich, amqp.ExchangeDirect},
 		{ExchangeEnrichRetry, amqp.ExchangeDirect},
@@ -63,16 +70,20 @@ func Declare(ch *amqp.Channel) error {
 			return fmt.Errorf("declare exchange %s: %w", e.name, err)
 		}
 	}
+	livePositions := amqp.Table{
+		"x-max-length": liveMaxLength, "x-overflow": "drop-head", "x-message-ttl": liveTTL.Milliseconds(),
+	}
+	liveAircraft := amqp.Table{"x-max-length": 10_000, "x-overflow": "drop-head"}
 	queues := []struct {
 		name, exchange, key string
 		args                amqp.Table
 	}{
-		{QueueLive, ExchangePositions, "#", amqp.Table{
-			"x-max-length": liveMaxLength, "x-overflow": "drop-head", "x-message-ttl": liveTTL.Milliseconds(),
-		}},
+		{QueueLive, ExchangePositions, "#", livePositions},
+		{QueueLivePublic, ExchangePositionsPublic, "", livePositions},
 		{QueueHistory, ExchangePositions, "#", nil},
 		{QueueAlerts, ExchangePositions, "#", amqp.Table{"x-max-length": alertsMaxLength, "x-overflow": "drop-head"}},
-		{QueueLiveAircraft, ExchangeAircraft, "", amqp.Table{"x-max-length": 10_000, "x-overflow": "drop-head"}},
+		{QueueLiveAircraft, ExchangeAircraft, "", liveAircraft},
+		{QueueLivePublicAircraft, ExchangeAircraft, "", liveAircraft},
 		{QueueEnrich, ExchangeEnrich, KeyJob, nil},
 		// A job sits here for RetryDelay, then dead-letters back onto the enrich exchange.
 		{QueueEnrichRetry, ExchangeEnrichRetry, KeyJob, amqp.Table{

@@ -1,5 +1,6 @@
 // Package relay turns the poller's snapshots into events: each new position report onto the positions exchange, and
-// an enrichment job for each aircraft or callsign not asked about lately.
+// an enrichment job for each aircraft or callsign not asked about lately. With PublicFeed set, that feed's own reports
+// go to the public exchange as well.
 package relay
 
 import (
@@ -13,6 +14,7 @@ import (
 
 	"github.com/amirradjou/overhead/internal/bus"
 	"github.com/amirradjou/overhead/internal/events"
+	"github.com/amirradjou/overhead/internal/feeds"
 	"github.com/amirradjou/overhead/internal/poller"
 )
 
@@ -33,12 +35,16 @@ type Relay struct {
 	Run      string
 	Pub      Publisher
 	AskAgain time.Duration
+	// PublicFeed names the feed whose reports may be shown publicly: its data's licence allows it, and merged reports
+	// would mix in feeds' whose terms do not (docs/setup.md, section 7). Empty publishes nothing to the public exchange.
+	PublicFeed string
 
-	seq   uint64
-	last  map[string]time.Time // hex → At of the newest position published
-	seen  map[string]time.Time // hex → when last in a snapshot
-	asked map[string]ask
-	stats Stats
+	seq        uint64
+	last       map[string]time.Time // hex → At of the newest position published
+	lastPublic map[string]time.Time // hex → At of the newest position published to the public exchange
+	seen       map[string]time.Time // hex → when last in a snapshot
+	asked      map[string]ask
+	stats      Stats
 }
 
 type ask struct {
@@ -67,8 +73,12 @@ func (r *Relay) Stats() Stats { return r.stats }
 func (r *Relay) Handle(ctx context.Context, snap poller.Snapshot) error {
 	if r.last == nil {
 		r.last, r.seen, r.asked = make(map[string]time.Time), make(map[string]time.Time), make(map[string]ask)
+		r.lastPublic = make(map[string]time.Time)
 	}
-	var msgs []bus.Message
+	msgs, err := r.publicMessages(snap)
+	if err != nil {
+		return err
+	}
 	newAsks := make(map[string]ask)
 	positions := 0
 	for _, a := range snap.Aircraft {
@@ -108,6 +118,33 @@ func (r *Relay) Handle(ctx context.Context, snap poller.Snapshot) error {
 	return nil
 }
 
+// publicMessages returns the events for the feed's reports not yet published. Nothing another feed said is added to
+// them. The other way round is fine: any feed's military or private flag still hides an aircraft from the public view.
+func (r *Relay) publicMessages(snap poller.Snapshot) ([]bus.Message, error) {
+	if r.PublicFeed == "" {
+		return nil, nil
+	}
+	merged := make(map[string]feeds.Position, len(snap.Aircraft))
+	for _, a := range snap.Aircraft {
+		merged[a.Hex] = a.Position
+	}
+	var msgs []bus.Message
+	for _, p := range snap.Answers[r.PublicFeed] {
+		if !p.At.After(r.lastPublic[p.Hex]) {
+			continue
+		}
+		r.lastPublic[p.Hex] = p.At
+		m := merged[p.Hex]
+		p.Military, p.Private = p.Military || m.Military, p.Private || m.Private
+		body, err := json.Marshal(events.Position{Run: r.Run, Published: snap.At, Position: p})
+		if err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, bus.Message{Exchange: bus.ExchangePositionsPublic, Body: body})
+	}
+	return msgs, nil
+}
+
 func (r *Relay) wantsJob(hex, callsign string, now time.Time) bool {
 	if strings.HasPrefix(hex, "~") {
 		return false // not an ICAO address: there is no airframe to look up
@@ -121,6 +158,7 @@ func (r *Relay) prune(now time.Time) {
 		if now.Sub(at) > forget {
 			delete(r.seen, h)
 			delete(r.last, h)
+			delete(r.lastPublic, h)
 			delete(r.asked, h)
 		}
 	}

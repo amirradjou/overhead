@@ -18,8 +18,9 @@ Settings and secrets go in two places, never in the repo:
 | [3. The evening log](#3-the-evening-log) | M2's check at the window |
 | [4. Heads-ups on the phone](#4-heads-ups-on-the-phone) | M5 |
 | [5. AWS and Snowflake](#5-aws-and-snowflake) | M3, M4, M6 |
-| [6. The public demo server](#6-the-public-demo-server) | M7 |
-| [7. Before anything is public](#7-before-anything-is-public) | M7 |
+| [6. The public page](#6-the-public-page) | M7 |
+| [7. What the sources allow on a public page](#7-what-the-sources-allow-on-a-public-page) | M7 |
+| [8. Development](#8-development) | the integration tests |
 
 ## 1. Home and window
 
@@ -57,7 +58,8 @@ always a little to one side, move `OVERHEAD_WINDOW_AZ` by that many degrees; if 
 still hidden behind the roofs, raise `OVERHEAD_WINDOW_MIN_EL`. (README item 9's setup view, a full-sky strip to do
 this against every plane round home, is not built yet.)
 
-Home's coordinates are private: the live API serves them, so port 8090 stays on the home network.
+The live API serves home's coordinates and every plane, private ones too, so port 8090 stays on the home network. Only
+`live-public` faces the internet (section 6).
 
 ## 2. The always-on machine and the TV
 
@@ -197,24 +199,92 @@ make up      # also builds the image and pushes it to ECR: needs Docker and a fe
 make down    # the same day
 ```
 
-## 6. The public demo server
+## 6. The public page
 
-M7 runs the same stack on a small rented server, in `-public` mode (commercial flights only) and centred on a public
-spot by the airport, never on home's `.env`.
+The page is the screen as a static site. Its planes come from `live-public`, a second instance of the live API that
+only gets what section 7 allows. No server is needed: the stack's machine runs it, a tunnel reaches it, and the page
+plays its recording whenever the machine is off. Anyone can read this instance's centre, window and height: that is
+what it shows. To keep your own home out of it, set its `OVERHEAD_LAT`, `OVERHEAD_LON` and window to a public spot.
 
-1. A server with 2 vCPU and 4 GB, Ubuntu 24.04, anywhere (the feeds are worldwide). On Hetzner Cloud: create a
-   project, then a server, and add the deploying machine's SSH public key (`cat ~/.ssh/id_ed25519.pub`) while
-   creating it.
-2. A firewall that lets in 22, 80 and 443 only.
-3. For HTTPS, a domain or subdomain with an A record pointing at the server.
+1. Name the feed it may show, in `.env`:
 
-## 7. Before anything is public
+   ```sh
+   OVERHEAD_PUBLIC_FEED=adsb.lol
+   ```
 
-- **planespotters.net's terms**: their site refuses scripted fetches, so read them in a browser and check that
-  hotlinked thumbnails with a linked photographer credit are allowed for a public, non-commercial page.
-- **The aircraft type facts** in `web/lib/aircraft.ts` are written from general knowledge, not a cited source: read them
-  and fix or cut any that are wrong.
-- **airplanes.live** (optional, a third feed): it answers 403 to projects it has not approved. Email
-  contact@airplanes.live saying what overhead is, that it is personal and non-commercial, the request rate (one
-  request every 5 s for a 60 km circle) and the User-Agent it sends. Once approved, run the poller with
-  `-feeds adsb.lol,adsb.fi,airplanes.live` (in compose: the `poll` service's `command`).
+2. Start it. It listens on `127.0.0.1:8091` only, and has no `.env`, no data volume and a read-only filesystem:
+
+   ```sh
+   docker compose --profile public up -d
+   curl -s 127.0.0.1:8091/api/now | head -c 300
+   ```
+
+3. Open a tunnel to that port and nothing else. With [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) (free,
+   and your home address stays hidden behind Tailscale's relays), on a port of its own so that anything already on 443
+   is left alone:
+
+   ```sh
+   tailscale funnel --bg --https=8443 http://127.0.0.1:8091
+   tailscale funnel --https=8443 off   # to close it again
+   ```
+
+4. Build the page with that address in it and publish it (the Netlify CLI, logged in):
+
+   ```sh
+   make site        # or: make site OVERHEAD_PUBLIC_API=https://other.host
+   ```
+
+5. A new recording, at a busy hour; 25 minutes is about 1 MB:
+
+   ```sh
+   (cd web && pnpm record-replay --minutes 25)
+   make site
+   ```
+
+**Check:** open the page. With the tunnel open it says "The planes are live"; with `live-public` stopped it says "a
+recording" within seconds, and goes back by itself when it returns.
+
+## 7. What the sources allow on a public page
+
+Read on 2026-11-05. This is a reading of their terms, not legal advice.
+
+| Source | What it says | What the public page does |
+|---|---|---|
+| adsb.lol | "The license for the API as well as all data ADSB.lol makes public is ODbL"; "If you want to use the API for production purposes, please contact me" | shows only this feed's own reports, with the ODbL notice; the recording is offered under the ODbL |
+| adsb.fi | "open data is for personal, non-commercial use only"; "You must cite adsb.fi and include a link to our home page" | not used: a public page is not clearly personal, and its data cannot be relicensed to merge under the ODbL. It may still hide a plane: its private and military flags count, though nothing it says is shown |
+| adsbdb | flight route data "may not be copied, published, or incorporated into other databases without the explicit permission of David J Taylor, Edinburgh" | no routes in any response or in the recording; a route only decides, unseen, whether a plane belongs to the followed airport. No such limit was found on its aircraft data, which is shown |
+| planespotters.net | its pages refuse scripted reads (403), so its terms are unread | no photos |
+| Open-Meteo | free for "Private or non-profit websites or apps that do not have subscriptions or advertising"; "You must include a link next to any location Open-Meteo data are displayed" and link the licence (CC BY 4.0) | credited with both links, and says the clouds are drawn from it |
+| aviationweather.gov | "rate limited to 100 requests per minute"; "Set a custom user agent"; US government data, public domain | one request every 10 minutes, with a user agent |
+| OpenStreetMap | "If you are distributing OSM in data form, please name and link directly to the license(s)" | "Map © OpenStreetMap contributors (ODbL)" on screen; the extract's licence in the README |
+
+**What only you can do.** Each one lets the page show more, or makes what it shows firmer. Nothing here is urgent: the
+page keeps to what is plainly allowed until you have an answer.
+
+1. **adsb.lol: tell the owner.** They ask to be contacted about production use. Say what overhead is (a free hobby page,
+   no ads, one request every 15 s for a 60 km circle, the same rate whatever the number of viewers), with the page's
+   address. Contact details are on [adsb.lol](https://adsb.lol) and in its
+   [GitHub project](https://github.com/adsblol/api).
+2. **adsb.fi (optional): ask whether a free public page counts as "personal, non-commercial".** With a yes, and a way
+   past the licence mix, the public page could update every 5 s, not every 15 s.
+3. **adsbdb's route data: ask David J Taylor** for permission to show routes on the page, which is the difference
+   between "POE2262" and "Boston to Billy Bishop". The same letter can ask whether a day-long private cache of them
+   (`data/enrich.db`) is fine: "incorporated into other databases" may cover it. With a yes:
+   `OVERHEAD_PUBLIC_ROUTES=on` in `.env`, then `docker compose --profile public up -d`.
+4. **planespotters.net: read the terms in a browser**, [photo API](https://www.planespotters.net/photo/api) and
+   [terms of use](https://www.planespotters.net/legal/termsofuse), and check hotlinked thumbnails with a linked
+   photographer credit are allowed on a free public page. If so: `OVERHEAD_PUBLIC_PHOTOS=on`.
+
+**airplanes.live** (optional, a third feed at home): it answers 403 to projects it has not approved. Email
+contact@airplanes.live saying what overhead is, that it is personal and non-commercial, the request rate (one request
+every 5 s for a 60 km circle) and the User-Agent it sends. Once approved, run the poller with
+`-feeds adsb.lol,adsb.fi,airplanes.live` (in compose: the `poll` service's `command`).
+
+## 8. Development
+
+The broker integration tests use a vhost of their own, created once:
+
+```sh
+docker compose exec rabbitmq sh -c 'rabbitmqctl add_vhost overhead-test; rabbitmqctl set_permissions -p overhead-test overhead ".*" ".*" ".*"'
+OVERHEAD_TEST_AMQP=amqp://overhead:overhead@localhost:5673/overhead-test make test
+```

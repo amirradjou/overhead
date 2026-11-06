@@ -23,7 +23,7 @@ variable "image_tag" {
 }
 
 variable "center" {
-  description = "The centre of the circle: the public demo uses the airport, not anyone's house."
+  description = "The centre of the circle the poller watches; the default is Toronto Pearson."
   type        = object({ lat = number, lon = number })
   default     = { lat = 43.6777, lon = -79.6248 }
 }

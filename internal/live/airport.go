@@ -63,6 +63,8 @@ type AirportView struct {
 	// rebuilt from the stored history when the live API starts.
 	ArrivalsToday   int `json:"arrivals_today"`
 	DeparturesToday int `json:"departures_today"`
+	// Uncounted says the counts mean nothing: the public instance has no history to rebuild them from.
+	Uncounted bool `json:"uncounted,omitempty"`
 }
 
 const (

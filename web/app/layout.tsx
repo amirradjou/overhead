@@ -10,9 +10,15 @@ const atkinson = localFont({
   display: "swap",
 });
 
+const description =
+  "The planes outside a real window high over Toronto's harbour, live, drawn where you would see them.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://overhead.amirradjou.com"),
   title: "overhead",
-  description: "The planes you can see from your window, live.",
+  description,
+  openGraph: { title: "overhead", description, type: "website", images: ["/og.jpg"] },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#000000" };

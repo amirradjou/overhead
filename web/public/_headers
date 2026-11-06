@@ -1,0 +1,8 @@
+# Netlify's headers for the public page; the public instance sends its own (internal/live: hardened).
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; base-uri 'none'; form-action 'none'; object-src 'none'
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
