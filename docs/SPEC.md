@@ -137,8 +137,8 @@ IPv4, ca-central-1) left running would cost roughly US$25 a month, so a US$5 bud
 [overhead-window.netlify.app](https://overhead-window.netlify.app) is the same screen looking out of the same window, for
 people who have never seen it. The page itself is static, on Netlify. Its planes come over one stream from `live-public`,
 a second instance of the live API on the machine at home, reached through a tunnel. There is no server that stays on
-for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of a real
-evening, labelled as one, until the feed returns. A recording knows what came next, so it draws each plane on its true
+for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of real
+traffic, labelled as one, until the feed returns. A recording knows what came next, so it draws each plane on its true
 path between reports (`lib/replay.ts`), where live has to guess from the last one.
 
 The home screen says more. This is its test scene, with made-up traffic, routes and a placeholder photo:

@@ -237,7 +237,8 @@ describe("the committed recording", () => {
   });
 
   it("has planes to show", () => {
-    const focused = rec.frames.filter((f) => f.planes.some((p) => p.focus && p.in_view));
+    // As the page plays it: smoothed, with planes on the ground on the ground.
+    const focused = smoothed(rec).frames.filter((f) => f.planes.some((p) => p.focus && p.in_view));
     expect(focused.length / rec.frames.length).toBeGreaterThan(0.25);
   });
 });
