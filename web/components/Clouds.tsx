@@ -62,9 +62,32 @@ function Clouds({ weather, w, sunAlt, horizonY }: Props) {
             <stop offset="0" stopColor={scape.lit} stopOpacity="0.32" />
             <stop offset="1" stopColor={scape.lit} stopOpacity="0" />
           </radialGradient>
-          {/* A slight blur melts the puffs into one another. It is painted once per reading, then only moved. */}
+          {/* Puffs alone read as a cartoon. Noise tears their edges, then thins them into wisps, as water vapour does;
+              a slight blur melts them together. It is painted once per reading, then only moved. */}
           <filter id="soften" x="-5%" y="-5%" width="110%" height="110%">
-            <feGaussianBlur stdDeviation="1.6 2.8" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.2 2" result="soft" />
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.03 0.032"
+              numOctaves="5"
+              seed="7"
+              result="noise"
+            />
+            <feDisplacementMap
+              in="soft"
+              in2="noise"
+              scale="24"
+              xChannelSelector="R"
+              yChannelSelector="G"
+              result="torn"
+            />
+            <feColorMatrix
+              in="noise"
+              type="matrix"
+              values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.6 2.2"
+              result="wisps"
+            />
+            <feComposite in="torn" in2="wisps" operator="in" />
           </filter>
           <linearGradient id="deck" x1="0" y1="0" x2="0" y2={hy} gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor={scape.shade} />
@@ -89,7 +112,16 @@ function Clouds({ weather, w, sunAlt, horizonY }: Props) {
             </pattern>
           )}
         </defs>
-        <g opacity={scape.opacity} filter="url(#soften)">
+        {/* The deck stays out of the filter: an overcast sky is smooth, and noise would punch holes in it. */}
+        {scape.deck > 0 && (
+          <g opacity={scape.opacity}>
+            <rect x="-40" y="-20" width="1080" height={hy + 20} fill="url(#deck)" opacity={scape.deck} />
+          </g>
+        )}
+        <g
+          opacity={scape.opacity}
+          filter={scape.streaks.length + scape.puffs.length ? "url(#soften)" : undefined}
+        >
           {scape.streaks.map((s, i) => (
             <ellipse
               key={`s${i}`}
@@ -101,9 +133,6 @@ function Clouds({ weather, w, sunAlt, horizonY }: Props) {
               transform={`rotate(${(s.tilt ?? 0).toFixed(1)} ${k(s.cx)} ${k(s.cy)})`}
             />
           ))}
-          {scape.deck > 0 && (
-            <rect x="-40" y="-20" width="1080" height={hy + 20} fill="url(#deck)" opacity={scape.deck} />
-          )}
           {scape.puffs.map((p, i) => (
             <ellipse
               key={i}
