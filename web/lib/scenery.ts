@@ -4,7 +4,7 @@
 // refraction), so a plane on its way down touches the drawn runway, as it does outside.
 import harbourData from "./scenery/toronto-harbour.json";
 import { greatCircleKm } from "./progress";
-import { looksDown, roofline, screenTop, seeded } from "./sky";
+import { looksDown, refractedEarthM, roofline, screenTop, seeded } from "./sky";
 import type { Window } from "./types";
 
 export type LatLon = [number, number];
@@ -32,7 +32,6 @@ export function sceneryFor(home: { lat: number; lon: number }, w: Window): Harbo
 }
 
 const rad = Math.PI / 180;
-const refractedEarthM = 6371008.8 * (4 / 3); // as internal/geo: the earth's radius, with standard refraction
 
 /** A point in metres from home: f straight out of the window, r to its right. */
 export type Local = [number, number];

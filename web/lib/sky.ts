@@ -2,6 +2,9 @@
 // the horizon, from the lowest angle visible over the rooftops to the top of the screen.
 import type { Window } from "./types";
 
+/** The earth's radius with standard refraction, in metres, as internal/geo. */
+export const refractedEarthM = 6371008.8 * (4 / 3);
+
 /** The highest angle drawn for a window without a top edge; anything above it sits at the top of the screen. */
 export const topDeg = 70;
 

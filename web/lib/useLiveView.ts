@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { frameAt, type Recording } from "./replay";
+import { placeOnGround } from "./ground";
+import { frameAt, smoothed, type Recording } from "./replay";
 import type { View } from "./types";
 
 export type Status = "connecting" | "live" | "reconnecting" | "replay";
@@ -58,7 +59,7 @@ export function useLiveView(): { view: View | null; status: Status } {
       if (wantReplay || !canReplay) return;
       wantReplay = true;
       try {
-        recording ??= (await (await fetch("/replay.json")).json()) as Recording;
+        recording ??= smoothed((await (await fetch("/replay.json")).json()) as Recording);
       } catch {
         wantReplay = false; // tried again the next time the feed is found silent
         return;
@@ -82,7 +83,8 @@ export function useLiveView(): { view: View | null; status: Status } {
         everLive = true;
         stopReplay();
         try {
-          setView(JSON.parse((e as MessageEvent<string>).data) as View);
+          const next = JSON.parse((e as MessageEvent<string>).data) as View;
+          setView({ ...next, planes: placeOnGround(next.planes, next.window, next.airport) });
           setStatus("live");
         } catch {
           // A garbled message is skipped; the next one replaces the whole picture anyway.
