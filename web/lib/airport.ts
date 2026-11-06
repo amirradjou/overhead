@@ -208,6 +208,7 @@ export function board(view: View | null, max = 6): BoardRow[] {
 
 /** "Runway 26 in use. 12 landings and 11 take-offs today." */
 export function airportDay(ap: FollowedAirport): string {
+  if (ap.uncounted) return ap.runway_in_use ? `Runway ${ap.runway_in_use} in use.` : "";
   const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
   const day = `${n(ap.arrivals_today, "landing", "landings")} and ${n(ap.departures_today, "take-off", "take-offs")} today`;
   return ap.runway_in_use

@@ -5,6 +5,7 @@ import {
   arrival,
   direction,
   flightFacts,
+  airlineName,
   flightName,
   fromTo,
   label,
@@ -121,6 +122,13 @@ describe("format", () => {
   it("names the flight, the aircraft and the route the way people say them", () => {
     expect(flightName(porter)).toBe("Porter Airlines 672");
     expect(flightName(plane({ callsign: "N123AB" }))).toBe("N123AB");
+    // Without a route, the callsign still names the airline; an unknown code is left as it is.
+    expect(flightName(plane({ callsign: "POE2262" }))).toBe("Porter Airlines 2262");
+    expect(flightName(plane({ callsign: "XXX123" }))).toBe("XXX123");
+    expect(airlineName(plane({ callsign: "POE2262" }))).toBe("Porter Airlines");
+    expect(airlineName(plane({ callsign: "XXX123" }))).toBeUndefined();
+    expect(airlineName(plane({ callsign: "N123AB" }))).toBeUndefined();
+    expect(airlineName(plane())).toBeUndefined();
     expect(flightName(plane())).toBe("C08861");
     expect(fromTo(porter)).toBe("From San Francisco to Toronto");
     expect(fromTo(plane())).toBe("");

@@ -877,6 +877,15 @@ a {
   display: block;
   white-space: nowrap;
 }
+.credits .about {
+  max-width: 30rem;
+  margin-bottom: 0.3rem;
+  white-space: normal;
+  color: var(--text);
+}
+.credits .about a {
+  text-decoration: underline;
+}
 
 .is-stale .caption,
 .is-stale .craft {
@@ -907,6 +916,18 @@ a {
   .credits,
   .card-photo {
     display: none;
+  }
+  /* A phone is no TV: the public page still names its sources, as their terms ask, and the board makes room. */
+  .is-public .credits {
+    display: block;
+    right: var(--safe-x);
+    font-size: 0.72rem;
+  }
+  .is-public .credits span {
+    white-space: normal;
+  }
+  .is-public .board {
+    top: calc(var(--safe-y) + 14rem);
   }
   .card {
     flex-wrap: wrap;

@@ -134,7 +134,7 @@ function Waiting({
   w?: Window;
   airport?: FollowedAirport;
 }) {
-  if (status !== "live") {
+  if (status !== "live" && status !== "replay") {
     return (
       <>
         <h1 className="flight is-quiet">Looking for planes</h1>

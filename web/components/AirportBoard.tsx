@@ -4,6 +4,7 @@ import type { FollowedAirport } from "@/lib/types";
 // The followed airport's board, like the one in its hall but only for what is moving now: landing, taking off,
 // taxiing, with where each flight comes from or goes and when. It sits on the sky, under the small overview.
 export default function AirportBoard({ airport, rows }: { airport: FollowedAirport; rows: BoardRow[] }) {
+  const day = airportDay(airport).replace(/^Runway \S+ in use\.\s*/, "");
   return (
     <section className="board">
       <p className="board-title">
@@ -26,7 +27,7 @@ export default function AirportBoard({ airport, rows }: { airport: FollowedAirpo
       ) : (
         <p className="board-empty">Nothing moving right now</p>
       )}
-      <p className="board-day">{airportDay(airport).replace(/^Runway \S+ in use\. /, "")}</p>
+      {day && <p className="board-day">{day}</p>}
     </section>
   );
 }

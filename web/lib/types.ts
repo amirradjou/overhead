@@ -73,6 +73,8 @@ export interface FollowedAirport {
   runway_in_use?: string;
   arrivals_today: number;
   departures_today: number;
+  /** The counts mean nothing here: the public instance starts them again at every restart, with no history to rebuild from. */
+  uncounted?: boolean;
 }
 
 /** The weather at home (Open-Meteo), when the live API has a fresh reading. */
@@ -159,4 +161,6 @@ export interface View {
   near_km?: number;
   airport?: FollowedAirport;
   weather?: Weather;
+  /** The public instance: for people who don't know the window, with one feed's planes and no routes or photos. */
+  public?: boolean;
 }

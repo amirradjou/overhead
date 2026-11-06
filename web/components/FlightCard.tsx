@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { airportStatus, endName, feet, heightFromWindow, lookShort } from "@/lib/airport";
-import { aircraftType, flightName, operator, photoCredit, speed, webLink } from "@/lib/format";
+import { airlineName, aircraftType, flightName, operator, photoCredit, speed, webLink } from "@/lib/format";
 import { flightProgress, km } from "@/lib/progress";
 import { profile, type ProfilePoint } from "@/lib/profile";
 import type { FollowedAirport, Plane, Window } from "@/lib/types";
@@ -25,9 +25,9 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
   const photo = plane.info?.photo;
   const route = plane.info?.route;
   const reg = plane.info?.registration || plane.registration;
-  const title = route?.airline ? flightName(plane) : reg || flightName(plane);
+  const title = airlineName(plane) ? flightName(plane) : reg || flightName(plane);
   const who = route?.airline || plane.info?.owner || "";
-  const sub = [aircraftType(plane), reg !== title ? reg : "", who && who !== title.split(" ")[0] ? who : ""]
+  const sub = [aircraftType(plane), reg !== title ? reg : "", who && !title.startsWith(who) ? who : ""]
     .filter(Boolean)
     .join(" · ");
   const status = plane.notable || airportStatus(plane, airport);
@@ -99,7 +99,9 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
             </p>
           </>
         ) : (
-          <p className="route">{operator(plane) || withoutRoute(plane, airport)}</p>
+          <p className="route">
+            {(!title.startsWith(who) && operator(plane)) || withoutRoute(plane, airport)}
+          </p>
         )}
         <p className="trip-note">
           {plane.distance_km < 10 ? plane.distance_km.toFixed(1) : Math.round(plane.distance_km)} km away ·

@@ -2,7 +2,7 @@
   "name": "overhead-screen",
   "version": "0.1.0",
   "private": true,
-  "description": "overhead's TV screen: the live map and the closest plane, fed by `overhead live` over Server-Sent Events",
+  "description": "overhead's window screen: the planes outside the window, fed by `overhead live` over Server-Sent Events",
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "lint": "prettier --check . && tsc --noEmit",
-    "screen-check": "node scripts/screen-check.mjs"
+    "screen-check": "node scripts/screen-check.mjs",
+    "record-replay": "node scripts/record-replay.mjs"
   },
   "browserslist": [
     "chrome >= 79",

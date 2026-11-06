@@ -181,3 +181,22 @@ describe("following an airport", () => {
     expect(bearingDeg({ lat: 43.6426, lon: -79.3871 }, ytz)).toBeCloseTo(203.6, 0);
   });
 });
+
+describe("the day's counts", () => {
+  const ap: FollowedAirport = {
+    icao: "CYTZ",
+    iata: "YTZ",
+    name: "Billy Bishop",
+    lat: 43.6275,
+    lon: -79.3962,
+    elevation_ft: 252,
+    arrivals_today: 0,
+    departures_today: 0,
+  };
+
+  it("say nothing they cannot back", () => {
+    expect(airportDay({ ...ap, uncounted: true })).toBe("");
+    expect(airportDay({ ...ap, uncounted: true, runway_in_use: "26" })).toBe("Runway 26 in use.");
+    expect(airportDay(ap)).toBe("0 landings and 0 take-offs today.");
+  });
+});

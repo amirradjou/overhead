@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { frameAt, type Recording } from "./replay";
 import type { View } from "./types";
 
-export type Status = "connecting" | "live" | "reconnecting";
+export type Status = "connecting" | "live" | "reconnecting" | "replay";
 
 // The server sends a snapshot every 2 s. A stream silent for this long is treated as dead and reopened: browsers
 // retry dropped streams by themselves, but not one that ended with an HTTP error, and a TV left on all day must
@@ -11,23 +12,63 @@ export type Status = "connecting" | "live" | "reconnecting";
 const silence = 15_000;
 
 /**
- * The live picture from `overhead live`. The API is on the page's own origin unless the address bar says
- * `?api=http://host:8090` (handy with `pnpm dev`).
+ * The live picture from `overhead live`. The API is on the page's own origin unless the build says otherwise
+ * (NEXT_PUBLIC_OVERHEAD_API, for a page hosted apart from it) or the address bar does (`?api=http://host:8090`, handy
+ * with `pnpm dev`).
+ *
+ * A page built with NEXT_PUBLIC_OVERHEAD_REPLAY=1 plays its recording while the feed is away, and returns to live the
+ * moment the feed does; the screen says which it is showing. `?replay` plays the recording on demand. A TV's page
+ * never falls back: at home, planes that are not there would be a lie.
  */
 export function useLiveView(): { view: View | null; status: Status } {
   const [view, setView] = useState<View | null>(null);
   const [status, setStatus] = useState<Status>("connecting");
 
   useEffect(() => {
-    const base = new URLSearchParams(window.location.search).get("api") ?? "";
+    const params = new URLSearchParams(window.location.search);
+    const base = params.get("api") ?? process.env.NEXT_PUBLIC_OVERHEAD_API ?? "";
+    const onDemand = params.has("replay");
+    const canReplay = onDemand || process.env.NEXT_PUBLIC_OVERHEAD_REPLAY === "1";
     let source: EventSource | null = null;
     let lastMessage = Date.now();
+    let everLive = false;
+    let wantReplay = false;
+    let recording: Recording | null = null;
+    let player: number | undefined;
+
+    const stopReplay = () => {
+      wantReplay = false;
+      window.clearInterval(player);
+      player = undefined;
+    };
+
+    const startReplay = async () => {
+      if (wantReplay || !canReplay) return;
+      wantReplay = true;
+      try {
+        recording ??= (await (await fetch("/replay.json")).json()) as Recording;
+      } catch {
+        wantReplay = false; // tried again the next time the feed is found silent
+        return;
+      }
+      if (!wantReplay) return; // the feed came back in the meantime
+      const rec = recording;
+      const started = Date.now();
+      const show = () => {
+        setView(frameAt(rec, Date.now() - started, new Date()));
+        setStatus("replay");
+      };
+      show();
+      player = window.setInterval(show, rec.step_s * 1000);
+    };
 
     const open = () => {
       source?.close();
       source = new EventSource(`${base}/api/events`);
       source.addEventListener("snapshot", (e) => {
         lastMessage = Date.now();
+        everLive = true;
+        stopReplay();
         try {
           setView(JSON.parse((e as MessageEvent<string>).data) as View);
           setStatus("live");
@@ -35,19 +76,30 @@ export function useLiveView(): { view: View | null; status: Status } {
           // A garbled message is skipped; the next one replaces the whole picture anyway.
         }
       });
-      source.onerror = () => setStatus("reconnecting");
+      source.onerror = () => {
+        setStatus((s) => (s === "replay" ? s : "reconnecting"));
+        // A page just opened has nothing to show: a stream that fails at once needs no long wait to be sure of it.
+        if (!everLive) void startReplay();
+      };
     };
+
+    if (onDemand) {
+      void startReplay();
+      return stopReplay;
+    }
 
     open();
     const watchdog = window.setInterval(() => {
       if (Date.now() - lastMessage > silence) {
-        setStatus("reconnecting");
+        setStatus((s) => (s === "replay" ? s : "reconnecting"));
+        void startReplay();
         lastMessage = Date.now(); // wait another full period before trying again
         open();
       }
     }, 5_000);
     return () => {
       window.clearInterval(watchdog);
+      stopReplay();
       source?.close();
     };
   }, []);

@@ -125,6 +125,8 @@ export const sourceHomes: Record<string, string> = {
   "planespotters.net": "https://www.planespotters.net",
   "open-meteo.com": "https://open-meteo.com",
   OpenStreetMap: "https://www.openstreetmap.org/copyright",
+  ODbL: "https://opendatacommons.org/licenses/odbl/1-0/",
+  "CC BY 4.0": "https://creativecommons.org/licenses/by/4.0/",
 };
 
 /** A link from the feeds, if it is a web address: anything else (javascript:, data:) is dropped, not followed. */
@@ -143,10 +145,52 @@ export function photoCredit(p: Plane): string {
  * callsign or registration.
  */
 export function flightName(p: Plane): string {
-  const airline = p.info?.route?.airline;
+  const airline = airlineName(p);
   const number = p.callsign?.match(/^[A-Z]{3}(\d[0-9A-Z]*)$/)?.[1];
   return airline && number ? `${airline} ${number}` : label(p);
 }
+
+/** The airline flying it, from its route or from its callsign's code; none for a private callsign or an unknown code. */
+export function airlineName(p: Plane): string | undefined {
+  return p.info?.route?.airline ?? airlines[p.callsign?.match(/^([A-Z]{3})\d/)?.[1] ?? ""];
+}
+
+/**
+ * Airlines seen round Toronto, by the ICAO code that begins their callsigns: for a flight whose route is unknown, or
+ * held back on the public page. Not the airframe's registered owner, which is often a leasing company.
+ */
+const airlines: Record<string, string> = {
+  AAL: "American Airlines",
+  ACA: "Air Canada",
+  AFR: "Air France",
+  ASH: "Mesa Airlines",
+  BAW: "British Airways",
+  CPA: "Cathay Pacific",
+  DAL: "Delta Air Lines",
+  DLH: "Lufthansa",
+  EDV: "Endeavor Air",
+  ENY: "Envoy Air",
+  FDX: "FedEx",
+  FLE: "Flair Airlines",
+  JIA: "PSA Airlines",
+  JZA: "Air Canada Express",
+  KLM: "KLM",
+  POE: "Porter Airlines",
+  PTR: "Porter Airlines",
+  QTR: "Qatar Airways",
+  ROU: "Air Canada Rouge",
+  RPA: "Republic Airways",
+  SKW: "SkyWest Airlines",
+  SWG: "Sunwing",
+  SWR: "Swiss",
+  THY: "Turkish Airlines",
+  TSC: "Air Transat",
+  UAE: "Emirates",
+  UAL: "United Airlines",
+  UPS: "UPS",
+  WEN: "WestJet Encore",
+  WJA: "WestJet",
+};
 
 /** "From San Francisco to Toronto", or "" when the route is unknown. */
 export function fromTo(p: Plane): string {
