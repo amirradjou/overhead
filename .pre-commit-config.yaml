@@ -8,7 +8,8 @@ repos:
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
-        exclude: ^web/public/replay\.json$ # the public page's recording: 1 MB, but 54 KB compressed
+        # The public page's recording (1 MB, but 54 KB compressed) and the README's demo: smooth takes more than 500 KB.
+        exclude: ^(web/public/replay\.json|docs/images/demo\.gif)$
       - id: check-merge-conflict
       - id: detect-private-key
 # Language-specific hooks are appended by /new-project (ruff, prettier, gofmt, rustfmt…)

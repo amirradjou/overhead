@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-label="Free flight feeds go to the poller, which publishes to RabbitMQ. From there the live API feeds the screen on your TV, the history writer feeds the facts job, the heads-up service messages your phone, and the enrichment worker looks up each aircraft.">
+  <style>
+    .panel { fill: #10141c; }
+    .box { fill: #1c2230; stroke: #39435a; stroke-width: 1.5; }
+    .box.hub { fill: #2a2433; stroke: #ffcf70; }
+    .box.end { fill: #182a3c; stroke: #5b86ad; }
+    .name { fill: #f2f4f7; font: 600 19px system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+    .note { fill: #a3acba; font: 400 14.5px system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+    .line { fill: none; stroke: #7c8798; stroke-width: 1.8; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7c8798" />
+    </marker>
+  </defs>
+
+  <rect class="panel" width="960" height="400" rx="14" />
+
+  <!-- The feeds and the poller -->
+  <rect class="box" x="28" y="150" width="150" height="100" rx="10" />
+  <text class="name" x="103" y="190">Free feeds</text>
+  <text class="note" x="103" y="214">adsb.lol, adsb.fi</text>
+
+  <rect class="box" x="222" y="160" width="124" height="80" rx="10" />
+  <text class="name" x="284" y="196">poll</text>
+  <text class="note" x="284" y="220">every few secs</text>
+
+  <rect class="box hub" x="390" y="150" width="130" height="100" rx="10" />
+  <text class="name" x="455" y="196">RabbitMQ</text>
+  <text class="note" x="455" y="220">a queue for each</text>
+
+  <!-- The consumers -->
+  <rect class="box" x="580" y="24" width="150" height="72" rx="10" />
+  <text class="name" x="655" y="56">live</text>
+  <text class="note" x="655" y="79">where you see it</text>
+
+  <rect class="box" x="580" y="118" width="150" height="72" rx="10" />
+  <text class="name" x="655" y="150">enrich</text>
+  <text class="note" x="655" y="173">type, airline, route</text>
+
+  <rect class="box" x="580" y="212" width="150" height="72" rx="10" />
+  <text class="name" x="655" y="244">history</text>
+  <text class="note" x="655" y="267">every plane kept</text>
+
+  <rect class="box" x="580" y="306" width="150" height="72" rx="10" />
+  <text class="name" x="655" y="338">heads-up</text>
+  <text class="note" x="655" y="361">rare visitors</text>
+
+  <!-- Where it ends up -->
+  <rect class="box end" x="782" y="24" width="150" height="72" rx="10" />
+  <text class="name" x="857" y="56">Your TV</text>
+  <text class="note" x="857" y="79">the window</text>
+
+  <rect class="box end" x="782" y="118" width="150" height="72" rx="10" />
+  <text class="name" x="857" y="150">adsbdb</text>
+  <text class="note" x="857" y="173">looked up once</text>
+
+  <rect class="box end" x="782" y="212" width="150" height="72" rx="10" />
+  <text class="name" x="857" y="244">DuckDB</text>
+  <text class="note" x="857" y="267">facts on screen</text>
+
+  <rect class="box end" x="782" y="306" width="150" height="72" rx="10" />
+  <text class="name" x="857" y="338">Your phone</text>
+  <text class="note" x="857" y="361">Telegram</text>
+
+  <!-- Arrows -->
+  <path class="line" d="M178 200 H219" />
+  <path class="line" d="M346 200 H387" />
+  <path class="line" d="M520 186 C552 186 548 60 577 60" />
+  <path class="line" d="M520 194 C552 194 548 154 577 154" />
+  <path class="line" d="M520 206 C552 206 548 248 577 248" />
+  <path class="line" d="M520 214 C552 214 548 342 577 342" />
+  <path class="line" d="M730 60 H779" />
+  <path class="line" d="M730 154 H779" />
+  <path class="line" d="M730 248 H779" />
+  <path class="line" d="M730 342 H779" />
+</svg>

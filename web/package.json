@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "lint": "prettier --check . && tsc --noEmit",
     "screen-check": "node scripts/screen-check.mjs",
-    "record-replay": "node scripts/record-replay.mjs"
+    "record-replay": "node scripts/record-replay.mjs",
+    "record-demo": "node scripts/record-demo.mjs"
   },
   "browserslist": [
     "chrome >= 79",
