@@ -4,7 +4,7 @@ The planes you can see from your window, live: a calm, screensaver-like view of 
 screen, with what each plane is, where it is going and which one is coming next. No radio hardware: it reads free
 community flight-tracking feeds.
 
-**See it: [overhead.amirradjou.com](https://overhead.amirradjou.com).** This is a real window, on a high floor over
+**See it: [overhead-window.netlify.app](https://overhead-window.netlify.app).** This is a real window, on a high floor over
 Toronto's harbour, with Billy Bishop airport on the island opposite.
 
 | The window | The screen |
@@ -170,7 +170,7 @@ IPv4, ca-central-1) left running would cost roughly US$25 a month, so a US$5 bud
 
 ## The public page
 
-[overhead.amirradjou.com](https://overhead.amirradjou.com) is the same screen looking out of the same window, for
+[overhead-window.netlify.app](https://overhead-window.netlify.app) is the same screen looking out of the same window, for
 people who have never seen it. The page itself is static, on Netlify. Its planes come over one stream from `live-public`,
 a second instance of the live API on the machine at home, reached through a tunnel. There is no server that stays on
 for this, so the page says which it is showing: live while that machine is up, and otherwise a recording of a real

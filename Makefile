@@ -35,11 +35,11 @@ image:
 	docker push $$repo:latest
 
 # The public page (docs/setup.md, section 6): the screen as a static site that reads the public instance's stream and
-# plays its recording while that is away. OVERHEAD_SITE is the Netlify site.
+# plays its recording while that is away. OVERHEAD_SITE is the Netlify site's ID (overhead-window).
 OVERHEAD_PUBLIC_API ?= https://framework.tail420820.ts.net:8443
-OVERHEAD_SITE ?= overhead-window
+OVERHEAD_SITE ?= eba2d9ba-6e75-44bb-9561-898079c5d503
 
 site:
 	cd web && NEXT_PUBLIC_OVERHEAD_API=$(OVERHEAD_PUBLIC_API) NEXT_PUBLIC_OVERHEAD_REPLAY=1 pnpm build
 	sed -i 's|OVERHEAD_PUBLIC_API|$(OVERHEAD_PUBLIC_API)|' web/out/_headers
-	cd web && netlify deploy --prod --dir out --site $(OVERHEAD_SITE)
+	cd web && netlify deploy --prod --no-build --dir out --site $(OVERHEAD_SITE)

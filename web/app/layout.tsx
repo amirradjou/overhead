@@ -14,7 +14,7 @@ const description =
   "The planes outside a real window high over Toronto's harbour, live, drawn where you would see them.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://overhead.amirradjou.com"),
+  metadataBase: new URL("https://overhead-window.netlify.app"),
   title: "overhead",
   description,
   openGraph: { title: "overhead", description, type: "website", images: ["/og.jpg"] },
