@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import FlightCard from "./FlightCard";
 import { typeFactLines } from "@/lib/aircraft";
 import { airportDay, airportStatus } from "@/lib/airport";
@@ -21,6 +21,8 @@ interface Props {
   /** The airport the screen follows, if any: its flights get the full story. */
   airport?: FollowedAirport;
   weather?: Weather;
+  /** The credits, under the words. */
+  children?: ReactNode;
 }
 
 // A line in the quiet place under the caption stays up this long before the next takes its place.
@@ -39,6 +41,7 @@ export default function Caption({
   home,
   airport,
   weather,
+  children,
 }: Props) {
   const skyLines = useSkyLines(home, now);
   const day = airport ? airportDay(airport) : "";
@@ -49,22 +52,25 @@ export default function Caption({
     : [day, ...sky, ...facts, ...skyLines].filter(Boolean);
   const line = rotating(lines, now, lineEvery);
   return (
-    <section className="caption" aria-live="polite">
-      {/* Keyed on the plane, so a new one fades in rather than overwriting the old one mid-sentence. */}
-      <div className="caption-body" key={plane?.hex ?? next?.hex ?? status}>
-        {plane && home ? (
-          <FlightCard plane={plane} airport={airport} w={home.window} now={now} />
-        ) : (
-          <Waiting next={next} status={status} w={home?.window} airport={airport} />
-        )}
+    <section className="caption">
+      <div className="caption-main" aria-live="polite">
+        {/* Keyed on the plane, so a new one fades in rather than overwriting the old one mid-sentence. */}
+        <div className="caption-body" key={plane?.hex ?? next?.hex ?? status}>
+          {plane && home ? (
+            <FlightCard plane={plane} airport={airport} w={home.window} now={now} />
+          ) : (
+            <Waiting next={next} status={status} w={home?.window} airport={airport} />
+          )}
+        </div>
+        <p className="caption-foot">
+          {line && (
+            <span key={line} className="fact">
+              {line}
+            </span>
+          )}
+        </p>
       </div>
-      <p className="caption-foot">
-        {line && (
-          <span key={line} className="fact">
-            {line}
-          </span>
-        )}
-      </p>
+      {children}
     </section>
   );
 }
@@ -145,7 +151,7 @@ function Waiting({
   if (!next) {
     return (
       <>
-        <h1 className="flight is-quiet">Clear skies</h1>
+        <h1 className="flight is-quiet">All quiet</h1>
         <p className="route">
           {airport
             ? `Nothing is landing at or leaving ${airport.name} right now.`

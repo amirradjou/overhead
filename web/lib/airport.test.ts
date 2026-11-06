@@ -6,6 +6,7 @@ import {
   board,
   fromToHere,
   heightFromWindow,
+  heightOver,
   lookWhere,
   shown,
   vertical,
@@ -64,6 +65,24 @@ const route = {
 };
 
 describe("following an airport", () => {
+  it("reads a flight's height over the runway, not over the sea", () => {
+    const final = { op: "arriving" as const, phase: "final" as const, distance_km: 0.4 };
+    expect(heightOver(plane("a", { ...final, height_ft: 12 }, { alt_ft: 350, alt_msl_ft: 264 }))).toBe(
+      "0 ft",
+    );
+    expect(heightOver(plane("a", undefined, { alt_ft: 3000 }))).toBe("3,000 ft");
+    expect(heightOver(plane("a", { ...final }, { on_ground: true }))).toBe("On the ground");
+  });
+
+  it("says a plane on final is touching down once it is over the runway's end", () => {
+    const final = { op: "arriving" as const, phase: "final" as const, distance_km: 0.4, in_min: 0.1 };
+    expect(airportStatus(plane("a", { ...final, height_ft: 300 }), ytz)).toBe(
+      "On final for runway 26, touchdown any moment",
+    );
+    expect(airportStatus(plane("a", { ...final, height_ft: 10 }), ytz)).toBe("Touching down on runway 26");
+    expect(airportStatus(plane("a", final), ytz)).toBe("On final for runway 26, touchdown any moment");
+  });
+
   it("shows only the focus planes on a focused screen", () => {
     const planes = [plane("a", {}, { focus: true }), plane("b")];
     const view = { planes, focused: true } as unknown as View;

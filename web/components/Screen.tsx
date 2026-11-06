@@ -71,43 +71,48 @@ export default function Screen() {
             home={view ? { lat: view.center.lat, lon: view.center.lon, window: view.window } : undefined}
             airport={view?.airport}
             weather={view?.weather}
-          />
-          <Credits view={view} mapped={mapped} replay={status === "replay"} />
+          >
+            <Credits view={view} mapped={mapped} />
+          </Caption>
+          {view?.public && <About mapped={mapped} replay={status === "replay"} />}
         </div>
       </div>
     </main>
   );
 }
 
-// Credits names every source as its terms ask (docs/setup.md, section 7). On the public instance they begin with a
-// line for someone who has never seen the window.
-function Credits({ view, mapped, replay }: { view: View | null; mapped: boolean; replay: boolean }) {
+// About is for someone who has never seen the window: where they are, what they are looking at, where to read more.
+function About({ mapped, replay }: { mapped: boolean; replay: boolean }) {
+  return (
+    <p className="about">
+      A real window{mapped && " high over Toronto's harbour"}.{" "}
+      {replay
+        ? "These planes are a recording, drawn where you would have seen them."
+        : "The planes are live, drawn where you would see them."}{" "}
+      <a href="https://github.com/amirradjou/overhead" rel="noopener">
+        How it works
+      </a>
+    </p>
+  );
+}
+
+// Credits names every source as its terms ask (docs/setup.md, section 7), in one quiet line under the caption.
+function Credits({ view, mapped }: { view: View | null; mapped: boolean }) {
   const sources = view?.sources ?? [];
   const photos = !view?.public || view.planes.some((p) => p.info?.photo);
   return (
     <p className="credits">
-      {view?.public && (
-        <span className="about">
-          You are at a real window{mapped && " high over Toronto's harbour"}.{" "}
-          {replay
-            ? "These planes are a recording, as the live feed is away for now, drawn where you would have seen them."
-            : "The planes are live, drawn where you would see them."}{" "}
-          <a href="https://github.com/amirradjou/overhead" rel="noopener">
-            How it works
-          </a>
-        </span>
-      )}
       {view?.public && sources.includes("adsb.lol") ? (
         <span>
-          Contains information from <Site name="adsb.lol" />, made available under the <Site name="ODbL" />
+          Contains information from <Site name="adsb.lol" />, available under the <Site name="ODbL" />
         </span>
       ) : (
         <span>
-          Positions from{" "}
+          Positions:{" "}
           {sources.length
             ? sources.map((name, i) => (
                 <Fragment key={name}>
-                  {i > 0 && (i === sources.length - 1 ? " and " : ", ")}
+                  {i > 0 && ", "}
                   <Site name={name} />
                 </Fragment>
               ))
@@ -115,17 +120,17 @@ function Credits({ view, mapped, replay }: { view: View | null; mapped: boolean;
         </span>
       )}
       <span>
-        Aircraft from <Site name="adsbdb" label="adsbdb.com" />
-        {photos && (
-          <>
-            , photos from <Site name="planespotters.net" />
-          </>
-        )}
+        Aircraft: <Site name="adsbdb" label="adsbdb.com" />
       </span>
+      {photos && (
+        <span>
+          Photos: <Site name="planespotters.net" />
+        </span>
+      )}
       {view?.weather && (
         <span>
-          Weather data by <Site name="open-meteo.com" label="Open-Meteo.com" /> (<Site name="CC BY 4.0" />
-          ), clouds drawn from it
+          Weather data by <Site name="open-meteo.com" label="Open-Meteo.com" /> (<Site name="CC BY 4.0" />)
+          {view.public && ", clouds drawn from it"}
         </span>
       )}
       {mapped && (

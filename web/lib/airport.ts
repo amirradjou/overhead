@@ -49,6 +49,9 @@ export function fromToHere(p: Plane, ap?: FollowedAirport): string {
   return from && to ? `From ${from} to ${to}` : "";
 }
 
+/** Below this height over the airport, in feet, a plane on final is touching down. */
+const touchingFt = 30;
+
 const inMin = (m?: number) => (m === undefined ? "" : m < 0.75 ? "any moment" : `in about ${duration(m)}`);
 const agoMin = (m?: number) => (m === undefined ? "" : m < 0.75 ? "just now" : `about ${duration(m)} ago`);
 
@@ -67,6 +70,8 @@ export function airportStatus(p: Plane, ap?: FollowedAirport): string {
       return `On approach${when && `, landing ${when}`}`;
     }
     case "final": {
+      // Over the runway's end the wheels are about to touch, whatever the time to touchdown still says.
+      if ((a.height_ft ?? touchingFt) < touchingFt) return `Touching down${onRw("on")}`;
       const when = inMin(a.in_min);
       return `On final${onRw("for")}${when && `, touchdown ${when}`}`;
     }
@@ -113,6 +118,13 @@ export function feet(p: Plane): string {
   if (p.on_ground) return "On the ground";
   const ft = altFt(p);
   return ft === undefined ? "" : `${thousands.format(Math.round(ft / 25) * 25)} ft`;
+}
+
+/** The height to read on a plane's card: over the runway for a flight at the followed airport, else over the sea. */
+export function heightOver(p: Plane): string {
+  const over = p.airport?.height_ft;
+  if (p.on_ground || over === undefined) return feet(p);
+  return `${thousands.format(Math.round(Math.max(0, over) / 25) * 25)} ft`;
 }
 
 /** "descending 700 ft/min", "climbing 1,800 ft/min", "level", or "" on the ground or when unknown. */
