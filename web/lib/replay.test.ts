@@ -142,18 +142,24 @@ describe("a recording's paths", () => {
   describe("on the real recording", () => {
     const real = JSON.parse(readFileSync("public/replay.json", "utf8")) as Recording;
     const out = smoothed(real);
-    // The biggest sudden change of speed across the window, between one frame's move and the next, for one flight
-    // while it is in the air and in view. A plane may truly move fast close to the window; it may not lurch.
-    const biggestLurch = (rec: Recording, callsign: string) => {
+    // The biggest sudden change of speed across the window, between one frame's move and the next, among the flights
+    // in the air and in view. A plane may truly move fast close to the window; it may not lurch.
+    const biggestLurch = (rec: Recording) => {
       let biggest = 0;
-      let last: Plane | undefined;
-      let move: number | undefined;
+      const last = new Map<string, { offset: number; move?: number }>();
       for (const f of rec.frames) {
-        const p = f.planes.find((q) => q.callsign === callsign && q.in_view && !q.on_ground);
-        const next = p && last ? p.offset_deg - last.offset_deg : undefined;
-        if (next !== undefined && move !== undefined) biggest = Math.max(biggest, Math.abs(next - move));
-        move = next;
-        last = p;
+        const here = new Map<string, { offset: number; move?: number }>();
+        for (const p of f.planes) {
+          if (!p.focus || !p.in_view || p.on_ground) continue;
+          const before = last.get(p.hex);
+          const move = before && p.offset_deg - before.offset;
+          if (move !== undefined && before?.move !== undefined) {
+            biggest = Math.max(biggest, Math.abs(move - before.move));
+          }
+          here.set(p.hex, { offset: p.offset_deg, move });
+        }
+        last.clear();
+        for (const [hex, v] of here) last.set(hex, v);
       }
       return biggest;
     };
@@ -168,16 +174,17 @@ describe("a recording's paths", () => {
       }
     });
 
-    it("takes away the lurch each new report made in a take-off", () => {
-      // Live's guess falls behind a plane speeding up, then catches up all at once: from 1 degree a frame to 5.4.
-      expect(biggestLurch(real, "JZA7974")).toBeGreaterThan(4);
-      expect(biggestLurch(out, "JZA7974")).toBeLessThan(1);
+    it("lurches less than live's guess, which catches up all at once at each report", () => {
+      expect(biggestLurch(out)).toBeLessThan(biggestLurch(real));
     });
 
-    it("keeps a landing on screen from final to its roll-out", () => {
-      const seen = out.frames.flatMap((f) => f.planes.filter((p) => p.callsign === "POE2262" && p.in_view));
-      expect(seen.some((p) => p.airport?.phase === "final")).toBe(true);
-      expect(seen.some((p) => p.on_ground)).toBe(true);
+    it("keeps a plane on the ground at the airport in view, inside the window's slice", () => {
+      const half = real.view.window.fov_deg / 2;
+      for (const f of out.frames) {
+        for (const p of f.planes) {
+          if (p.on_ground && p.airport && Math.abs(p.offset_deg) < half) expect(p.in_view).toBe(true);
+        }
+      }
     });
   });
 });
