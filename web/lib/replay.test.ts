@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { check, compact } from "../scripts/record-replay.mjs";
-import { frameAt, type Recording } from "./replay";
+import { frameAt, smoothed, type Recording } from "./replay";
 import type { Plane, View } from "./types";
 
 const plane = (hex: string, at: string, extra: Partial<Plane> = {}): Plane => ({
@@ -58,6 +58,127 @@ describe("a recording", () => {
   it("loops", () => {
     const now = new Date();
     expect(frameAt(rec, 4000, now).planes).toEqual(frameAt(rec, 0, now).planes);
+  });
+});
+
+describe("a recording's paths", () => {
+  const at = (s: number) => new Date(Date.parse(t0) + s * 1000).toISOString();
+  const airport = {
+    icao: "CYTZ",
+    iata: "YTZ",
+    name: "Billy Bishop",
+    lat: 43.6275,
+    lon: -79.3962,
+    elevation_ft: 252,
+    arrivals_today: 0,
+    departures_today: 0,
+  };
+  // Reports at 0, 4 and 8 s; the frames in between hold the live API's guess, which sails on from the last report.
+  const flight: [number, Partial<Plane>][] = [
+    [0, { offset_deg: 0, elevation_deg: -5, speed_kt: 100, alt_ft: 400 }],
+    [0, { offset_deg: 9, elevation_deg: -6, speed_kt: 100, alt_ft: 400 }],
+    [4, { offset_deg: 10, elevation_deg: -6, speed_kt: 80, alt_ft: 300 }],
+    [4, { offset_deg: 19, elevation_deg: -7, speed_kt: 80, alt_ft: 300 }],
+    [8, { offset_deg: 12, elevation_deg: 0, speed_kt: 40, on_ground: true, distance_km: 1.3 }],
+    [8, { offset_deg: 12, elevation_deg: 0, speed_kt: 40, on_ground: true, distance_km: 1.3 }],
+  ];
+  const rec = smoothed(
+    compact(
+      flight.map(([reported, extra], i) =>
+        view(
+          at(i * 2),
+          [
+            plane("aaaaaa", at(reported), {
+              airport: { op: "arriving", phase: "final", distance_km: 1 },
+              ...extra,
+            }),
+          ],
+          { airport },
+        ),
+      ),
+      2,
+    ),
+  );
+  const drawn = rec.frames.map((f) => f.planes[0]!);
+
+  it("goes through each report rather than past it", () => {
+    expect(drawn[0]!.offset_deg).toBe(0);
+    expect(drawn[1]!.offset_deg).toBeGreaterThan(0);
+    expect(drawn[1]!.offset_deg).toBeLessThan(10); // not the guess of 9 + the jump back from 19 at the end
+    expect(drawn[2]!.offset_deg).toBe(10);
+    expect(drawn[3]!.offset_deg).toBeLessThanOrEqual(12);
+  });
+
+  it("never runs back past where it stops", () => {
+    const offsets = drawn.map((p) => p.offset_deg);
+    expect(offsets).toEqual([...offsets].sort((a, b) => a - b));
+  });
+
+  it("slows and descends between reports", () => {
+    expect(drawn[1]!.speed_kt).toBeCloseTo(90);
+    expect(drawn[1]!.alt_ft).toBeCloseTo(350);
+  });
+
+  it("stays on screen after touchdown, on the ground", () => {
+    expect(drawn[4]!.on_ground).toBe(true);
+    expect(drawn[4]!.in_view).toBe(true);
+    expect(drawn[4]!.elevation_deg).toBeLessThan(-5);
+  });
+
+  it("is not drawn across a long silence", () => {
+    const gap = smoothed(
+      compact(
+        [
+          view(at(0), [plane("aaaaaa", at(0), { offset_deg: 0 })]),
+          view(at(60), [plane("aaaaaa", at(0), { offset_deg: 5 })]),
+          view(at(120), [plane("aaaaaa", at(120), { offset_deg: 40 })]),
+        ],
+        60,
+      ),
+    );
+    expect(gap.frames[1]!.planes[0]!.offset_deg).toBe(5);
+  });
+
+  describe("on the real recording", () => {
+    const real = JSON.parse(readFileSync("public/replay.json", "utf8")) as Recording;
+    const out = smoothed(real);
+    // The biggest sudden change of speed across the window, between one frame's move and the next, for one flight
+    // while it is in the air and in view. A plane may truly move fast close to the window; it may not lurch.
+    const biggestLurch = (rec: Recording, callsign: string) => {
+      let biggest = 0;
+      let last: Plane | undefined;
+      let move: number | undefined;
+      for (const f of rec.frames) {
+        const p = f.planes.find((q) => q.callsign === callsign && q.in_view && !q.on_ground);
+        const next = p && last ? p.offset_deg - last.offset_deg : undefined;
+        if (next !== undefined && move !== undefined) biggest = Math.max(biggest, Math.abs(next - move));
+        move = next;
+        last = p;
+      }
+      return biggest;
+    };
+
+    it("keeps every frame and every number", () => {
+      expect(out.frames.length).toBe(real.frames.length);
+      for (const f of out.frames) {
+        for (const p of f.planes) {
+          expect(Number.isFinite(p.offset_deg)).toBe(true);
+          expect(Number.isFinite(p.elevation_deg)).toBe(true);
+        }
+      }
+    });
+
+    it("takes away the lurch each new report made in a take-off", () => {
+      // Live's guess falls behind a plane speeding up, then catches up all at once: from 1 degree a frame to 5.4.
+      expect(biggestLurch(real, "JZA7974")).toBeGreaterThan(4);
+      expect(biggestLurch(out, "JZA7974")).toBeLessThan(1);
+    });
+
+    it("keeps a landing on screen from final to its roll-out", () => {
+      const seen = out.frames.flatMap((f) => f.planes.filter((p) => p.callsign === "POE2262" && p.in_view));
+      expect(seen.some((p) => p.airport?.phase === "final")).toBe(true);
+      expect(seen.some((p) => p.on_ground)).toBe(true);
+    });
   });
 });
 

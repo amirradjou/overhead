@@ -1,4 +1,4 @@
-// Package history turns the history queue into one-minute batch files of gzipped JSONL (README: History), and checks
+// Package history turns the history queue into one-minute batch files of gzipped JSONL (docs/SPEC.md: History), and checks
 // the files for lost or duplicated events.
 package history
 

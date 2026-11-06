@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { airportStatus, endName, feet, heightFromWindow, lookShort } from "@/lib/airport";
+import { airportStatus, endName, heightFromWindow, heightOver, lookShort } from "@/lib/airport";
 import { airlineName, aircraftType, flightName, operator, photoCredit, speed, webLink } from "@/lib/format";
 import { flightProgress, km } from "@/lib/progress";
 import { profile, type ProfilePoint } from "@/lib/profile";
@@ -46,8 +46,9 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
       if (trail.current.length > 45) trail.current.shift();
     }
   }
+  // In the air only: once it is down the side view has nothing left to say, and the plane is on the drawn runway.
   const side =
-    at && airport
+    at && airport && !plane.on_ground
       ? profile(at, trail.current.slice(0, -1), w.home_elevation_m - airport.elevation_ft * 0.3048)
       : null;
 
@@ -156,13 +157,15 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
                 />
               )}
             </svg>
+            {/* A box the side view's size, moved by transform, so the dot glides without a layout per frame. */}
             <span
-              className="side-plane"
+              className="side-track"
               style={{
-                left: `${(side.plane[0] * 100).toFixed(1)}%`,
-                top: `${(side.plane[1] * 100).toFixed(1)}%`,
+                transform: `translate(${(side.plane[0] * 100).toFixed(1)}%, ${(side.plane[1] * 100).toFixed(1)}%)`,
               }}
-            />
+            >
+              <span className="side-plane" />
+            </span>
             {side.windowY !== null && (
               <span
                 className={`side-label is-window${side.departing ? " is-right" : ""}`}
@@ -178,7 +181,7 @@ export default function FlightCard({ plane, airport, w, now }: Props) {
             </span>
           </div>
         )}
-        {side?.path && <p className="side-note">{side.path}</p>}
+        {side && <p className="side-note">{side.path}</p>}
         <div className="tiles">
           {tiles(plane, w).map((t) => (
             <p key={t.label} className="tile">
@@ -198,13 +201,13 @@ function tiles(p: Plane, w: Window): { label: string; value: string; note: strin
   const out = [
     {
       label: "Height",
-      value: feet(p) || "–",
-      note: heightFromWindow(p, w).replace("your window", "you"),
+      value: heightOver(p) || "–",
+      note: p.on_ground ? "" : heightFromWindow(p, w).replace("your window", "you"),
     },
     {
       label: "Speed",
-      value: speed(p) || (p.on_ground ? `${Math.round(p.speed_kt ?? 0)} kt` : "–"),
-      note: p.speed_kt !== undefined && !p.on_ground ? `${Math.round(p.speed_kt)} knots` : "",
+      value: speed(p) || (p.on_ground ? `${Math.round((p.speed_kt ?? 0) * 1.852)} km/h` : "–"),
+      note: p.speed_kt !== undefined ? `${Math.round(p.speed_kt)} knots` : "",
     },
   ];
   const v = p.vert_rate_fpm;
@@ -229,7 +232,7 @@ function tiles(p: Plane, w: Window): { label: string; value: string; note: strin
 // passing close by.
 function withoutRoute(p: Plane, ap?: FollowedAirport): string {
   const name = ap?.name ?? "the airport";
-  if (p.airport?.op === "arriving") return `Landing at ${name}`;
+  if (p.airport?.op === "arriving") return `${p.on_ground ? "Landed" : "Landing"} at ${name}`;
   if (p.airport?.op === "departing") return `Leaving ${name}`;
   if (p.airport) return `On the ground at ${name}`;
   return p.near ? "Passing close by" : "Route unknown";

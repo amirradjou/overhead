@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// S3Store keeps batches in an S3 bucket under a prefix, where Snowpipe picks them up (README: History). The keys
+// S3Store keeps batches in an S3 bucket under a prefix, where Snowpipe picks them up (docs/SPEC.md: History). The keys
 // are the same as DirStore's, so a redelivered batch overwrites its own object.
 type S3Store struct {
 	Client *s3.Client

@@ -294,7 +294,10 @@ function Craft({ plane, w, size, dark, featured, sun, turn }: CraftProps) {
   const trueDeg = ((look.lengthM / Math.max(200, slantM)) * 180) / Math.PI;
   const lengthPx =
     Math.min(260, Math.max(featured ? 100 : 64, trueDeg * (size.width / w.fov_deg) * 3)) * scale;
-  const att = attitude(plane, turn);
+  // A taxiing plane's feed can stop giving its track: it keeps pointing the way it last did, not north.
+  const pointing = useRef(plane.track_deg);
+  pointing.current = plane.track_deg ?? pointing.current;
+  const att = attitude({ ...plane, track_deg: pointing.current }, turn);
   // Drawn again only when the view of it changes enough to see.
   const key = [
     Math.round(att.headingDeg / 2),
@@ -329,7 +332,7 @@ function Craft({ plane, w, size, dark, featured, sun, turn }: CraftProps) {
   const labelAt = Math.round(lengthPx * 0.42 + 10 * scale);
   return (
     <div
-      className={`craft${featured ? " is-featured" : ""}${labelLeft ? " label-left" : ""}`}
+      className={`craft${featured ? " is-featured" : ""}${labelLeft ? " label-left" : ""}${plane.on_ground ? " on-ground" : ""}`}
       style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
     >
       <svg

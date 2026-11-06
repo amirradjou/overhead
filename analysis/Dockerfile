@@ -1,4 +1,4 @@
-# overhead-stats: the facts job (README: Where it runs). docker compose builds it as overhead-stats:local.
+# overhead-stats: the facts job (docs/SPEC.md: Where it runs). docker compose builds it as overhead-stats:local.
 FROM ghcr.io/astral-sh/uv:0.12.15-python3.13-trixie-slim
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_DEV=1

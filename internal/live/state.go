@@ -20,8 +20,8 @@ const DefaultMaxAge = 60 * time.Second
 // airline matches an airline flight's callsign: the operator's three-letter ICAO code and a flight number.
 var airline = regexp.MustCompile(`^[A-Z]{3}[0-9][0-9A-Z]{0,3}$`)
 
-// Commercial reports whether p looks like an airline flight, the only kind the public screen shows (README privacy
-// rule): an airline callsign, and neither military nor flagged private.
+// Commercial reports whether p looks like an airline flight, the only kind the public screen shows (privacy
+// rule, docs/SPEC.md): an airline callsign, and neither military nor flagged private.
 func Commercial(p feeds.Position) bool {
 	return airline.MatchString(p.Callsign) && !p.Military && !p.Private
 }
@@ -31,7 +31,7 @@ type State struct {
 	Center   geo.Point
 	RadiusKm float64
 	MaxAge   time.Duration
-	// Public keeps only commercial flights in views (README privacy rule), without routes or photos unless PublicRoutes
+	// Public keeps only commercial flights in views (privacy rule, docs/SPEC.md), without routes or photos unless PublicRoutes
 	// or PublicPhotos says their sources allow it (docs/setup.md, section 7), and only the planes a focused screen shows.
 	Public, PublicRoutes, PublicPhotos bool
 	// Window is the view the screen draws; the zero value is DefaultWindow.

@@ -13,7 +13,7 @@ import (
 	"github.com/amirradjou/overhead/internal/geo"
 )
 
-// Position is one aircraft's position report. It is the event the poller publishes (README: Event flow), so its JSON
+// Position is one aircraft's position report. It is the event the poller publishes (docs/SPEC.md: Event flow), so its JSON
 // form is the wire format.
 type Position struct {
 	// Hex is the ICAO 24-bit address in lowercase hex; a "~" prefix marks a non-ICAO address (TIS-B).
@@ -36,7 +36,7 @@ type Position struct {
 	TrackDeg    *float64 `json:"track_deg,omitempty"`
 	VertRateFpm *int     `json:"vert_rate_fpm,omitempty"`
 	Military    bool     `json:"military,omitempty"`
-	// Private marks aircraft whose owner asked not to be identified (FAA LADD or PIA); see the README privacy rule.
+	// Private marks aircraft whose owner asked not to be identified (FAA LADD or PIA); see the privacy rule in docs/SPEC.md.
 	Private bool `json:"private,omitempty"`
 	// Source is the feed this report came from; SourceType is how that network heard it (adsb_icao, mlat, ...).
 	Source     string `json:"source"`
@@ -81,7 +81,7 @@ type source struct {
 	spacing time.Duration
 }
 
-// sources are the networks overhead can read. All three serve readsb's JSON; terms checked 2026-10-29 (README: Data
+// sources are the networks overhead can read. All three serve readsb's JSON; terms checked 2026-10-29 (docs/SPEC.md: Data
 // sources). airplanes.live now answers 403 until the project is approved by email.
 var sources = map[string]source{
 	// adsb.lol's limits are "dynamic"; one request every 5 s drew 429s within four minutes on 2026-10-29.

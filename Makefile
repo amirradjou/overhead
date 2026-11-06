@@ -13,7 +13,7 @@ lint:
 fmt:
 	gofmt -w .
 
-# M6: the AWS and Snowflake side (README: Infra). AWS credentials and region as usual; SNOWFLAKE_* for Snowflake,
+# M6: the AWS and Snowflake side (docs/SPEC.md: Infra). AWS credentials and region as usual; SNOWFLAKE_* for Snowflake,
 # or TF_VAR_snowflake=false to leave it out. `make down` removes everything, data included.
 TF := terraform -chdir=terraform
 

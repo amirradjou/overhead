@@ -72,7 +72,7 @@ func addCircleFlags(fs *flag.FlagSet) (*circle, error) {
 	}
 	fs.Float64Var(&c.center.Lat, "lat", c.center.Lat, "latitude of the centre (OVERHEAD_LAT)")
 	fs.Float64Var(&c.center.Lon, "lon", c.center.Lon, "longitude of the centre (OVERHEAD_LON)")
-	// 60 km sees a plane a few minutes before it reaches the window (README: Poller).
+	// 60 km sees a plane a few minutes before it reaches the window (docs/SPEC.md: Poller).
 	fs.Float64Var(&c.radius, "radius", 60, "radius in km")
 	return c, nil
 }
@@ -148,7 +148,7 @@ func envFloat(name string, fallback float64) (float64, error) {
 	return f, nil
 }
 
-// addWindowFlags registers the window's settings (README: Screen), each with its environment variable.
+// addWindowFlags registers the window's settings (docs/SPEC.md: Screen), each with its environment variable.
 func addWindowFlags(fs *flag.FlagSet) (*live.Window, error) {
 	w := live.DefaultWindow
 	for _, f := range []struct {

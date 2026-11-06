@@ -1,4 +1,4 @@
-"""Facts for the screen to show between planes (README: Stats).
+"""Facts for the screen to show between planes (docs/SPEC.md: Stats).
 
 Each fact is one plain sentence, and only appears once the history can back it: "the rarest type this month" means
 little after an hour of data, so it waits for a few days.
@@ -106,7 +106,7 @@ def _prepare(con: duckdb.DuckDBPyConnection, tz: str, w: Window) -> None:
         SELECT *, (first_seen AT TIME ZONE getvariable('tz'))::DATE AS local_day,
                   hour(first_seen AT TIME ZONE getvariable('tz')) AS local_hour,
                   -- An airline flight, as the live API's public mode has it (internal/live: Commercial): only these
-                  -- may be named by registration on a screen others can see (README privacy rule).
+                  -- may be named by registration on a screen others can see (privacy rule, docs/SPEC.md).
                   regexp_full_match(coalesce(callsign, ''), '[A-Z]{{3}}[0-9][0-9A-Z]{{0,3}}')  -- {{}}: an f-string
                       AND NOT military AND NOT private AS commercial
         FROM ({passes_sql()})
